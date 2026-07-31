@@ -85,20 +85,53 @@ export async function saveEntry(
 }
 
 /**
- * Chỉ UPDATE mood của entry đã tồn tại.
- * Nếu chưa có entry cho ngày đó → trả về null và KHÔNG tạo row mới
- * (tránh sinh entry rỗng làm sáng heatmap).
+ * Return the existing entry for `date`, or create one with empty content.
+ * Sets is_backfill correctly at creation time (date < today).
+ * Used by PhotoStrip and MoodPicker to ensure an entry row exists
+ * before attaching photos or mood. Empty-content entries are filtered
+ * out of heatmap/stats so they don't light up the calendar.
  */
-export async function updateMood(date: string, mood: Mood | null): Promise<Entry | null> {
-  const supabase = createClient()
-
+export async function ensureEntry(date: string, tz: string): Promise<Entry> {
   const existing = await fetchEntry(date)
-  if (!existing) return null
+  if (existing) return existing
+
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const isBackfill = date < getTodayInTimezone(tz)
+  const { data, error } = await supabase
+    .from('entries')
+    .insert({
+      user_id: user.id,
+      entry_date: date,
+      content: '',
+      word_count: 0,
+      is_backfill: isBackfill,
+      mood: null,
+    })
+    .select(ENTRY_COLS)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+/**
+ * UPDATE mood of an existing entry, or create an empty entry first if needed.
+ */
+export async function updateMood(
+  date: string,
+  mood: Mood | null,
+  tz: string
+): Promise<Entry> {
+  const entry = await ensureEntry(date, tz)
+  const supabase = createClient()
 
   const { data, error } = await supabase
     .from('entries')
     .update({ mood })
-    .eq('id', existing.id)
+    .eq('id', entry.id)
     .select(ENTRY_COLS)
     .single()
 

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { fetchEntry, saveEntry, updateMood, type Entry } from '@/lib/entries'
+import { fetchEntry, saveEntry, updateMood, ensureEntry, type Entry } from '@/lib/entries'
 import { countWords, getTodayInTimezone } from '@/lib/dates'
 import type { Mood } from '@/lib/streaks'
 import MoodPicker from '@/components/MoodPicker'
-import { segmentCorrected, filterChanges, type StoredSuggestion } from '@/lib/suggestions'
+import { filterChanges, type StoredSuggestion } from '@/lib/suggestions'
+import { diffTexts, diffToSegments, buildDiffChanges } from '@/lib/diff'
 import ImprovedVersionPane from '@/components/ImprovedVersionPane'
 import SuggestionDetails from '@/components/SuggestionDetails'
 import SuggestionPanel from '@/components/SuggestionPanel'
@@ -77,7 +78,9 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const safeChanges = suggestion ? filterChanges(suggestion.changes as unknown[]) : []
-  const segments = suggestion ? segmentCorrected(suggestion.corrected_version, safeChanges) : []
+  const diffSpans = suggestion ? diffTexts(suggestion.source_content, suggestion.corrected_version) : []
+  const segments = suggestion ? diffToSegments(diffSpans) : []
+  const diffChanges = suggestion ? buildDiffChanges(diffSpans, safeChanges) : []
   const hasSuggestionVisible = suggestion !== null && !dismissed
   const contentDrifted =
     suggestion != null && content.trim() !== suggestion.source_content.trim()
@@ -145,17 +148,17 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
     async (newMood: Mood | null) => {
       setMood(newMood)
       moodRef.current = newMood
-      if (entryExistsRef.current) {
-        setSaveStatus('saving')
-        try {
-          await updateMood(date, newMood)
-          setSaveStatus('saved')
-        } catch {
-          setSaveStatus('error')
-        }
+      setSaveStatus('saving')
+      try {
+        const result = await updateMood(date, newMood, timezone)
+        entryExistsRef.current = true
+        setIsBackfill(result.is_backfill)
+        setSaveStatus('saved')
+      } catch {
+        setSaveStatus('error')
       }
     },
-    [date]
+    [date, timezone]
   )
 
   // ── Suggestion fetch ─────────────────────────────────────────────────────
@@ -266,7 +269,7 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
               <ImprovedVersionPane
                 key={suggestion.id}
                 segments={segments}
-                changesCount={safeChanges.length}
+                changesCount={diffChanges.length}
                 correctedVersion={suggestion.corrected_version}
                 selectedChange={selectedChange}
                 onSelectChange={handleSelectChange}
@@ -297,7 +300,7 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
           {/* Changes list + feedback — full width, only when two-column view is active */}
           {hasSuggestionVisible && (
             <SuggestionDetails
-              changes={safeChanges}
+              changes={diffChanges}
               feedback={suggestion!.overall_feedback}
               contentDrifted={contentDrifted}
               selectedChange={selectedChange}

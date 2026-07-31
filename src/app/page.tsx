@@ -3,12 +3,25 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
 import StatsBar from '@/components/StatsBar'
-import HeatmapGrid from '@/components/HeatmapGrid'
-import MonthCalendar from '@/components/MonthCalendar'
+import HeatmapCard from '@/components/HeatmapCard'
 import { getTodayInTimezone } from '@/lib/dates'
-import { computeStats, buildHeatmapWeeks } from '@/lib/streaks'
+import { computeStats } from '@/lib/streaks'
 import type { EntryLite } from '@/lib/streaks'
-import { isValidMonthString, monthOf, buildMonthGrid } from '@/lib/calendar'
+import {
+  isValidMonthString,
+  monthOf,
+  buildMonthGrid,
+  buildYearGrid,
+  monthLabelOffsets,
+  yearStats,
+  monthStats,
+  isValidYear,
+} from '@/lib/calendar'
+
+const MONTHS_FULL = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+]
 
 export default async function HomePage({
   searchParams,
@@ -34,19 +47,28 @@ export default async function HomePage({
   const tz = profile?.timezone ?? 'Asia/Ho_Chi_Minh'
   const today = getTodayInTimezone(tz)
   const currentMonth = monthOf(today)
+  const currentYear = Number(today.slice(0, 4))
 
-  // Resolve month from URL, validate, clamp future
+  // ── Parse URL params ──────────────────────────────────────────────────
   const params = await searchParams
-  const rawMonth = typeof params.month === 'string' ? params.month : undefined
-  let monthStr: string
-  if (rawMonth && isValidMonthString(rawMonth) && rawMonth <= currentMonth) {
-    monthStr = rawMonth
+  const rawHView = typeof params.hview === 'string' ? params.hview : undefined
+  const rawYear = typeof params.y === 'string' ? params.y : undefined
+  const rawHm = typeof params.hm === 'string' ? params.hm : undefined
+
+  const mode: 'year' | 'month' = rawHView === 'month' ? 'month' : 'year'
+
+  // Year mode: validate & clamp
+  const year = isValidYear(rawYear, currentYear) ?? currentYear
+
+  // Month mode: validate & clamp
+  let hmStr: string
+  if (rawHm && isValidMonthString(rawHm) && rawHm <= currentMonth) {
+    hmStr = rawHm
   } else {
-    monthStr = currentMonth
+    hmStr = currentMonth
   }
 
-  const canGoNext = monthStr < currentMonth
-
+  // ── Fetch entries ─────────────────────────────────────────────────────
   const { data: rows } = await supabase
     .from('entries')
     .select('entry_date, is_backfill, word_count, mood')
@@ -58,9 +80,28 @@ export default async function HomePage({
     mood: (r.mood as EntryLite['mood']) ?? null,
   }))
 
+  // ── Compute derived data ──────────────────────────────────────────────
   const stats = computeStats(entries, today)
-  const weeks = buildHeatmapWeeks(entries, today, 53)
-  const monthGrid = buildMonthGrid(entries, monthStr, today)
+
+  // Year grid
+  const yGrid = buildYearGrid(entries, year, today)
+  const yLabels = monthLabelOffsets(yGrid)
+  const yStats = yearStats(entries, year)
+
+  // Month grid
+  const mGrid = buildMonthGrid(entries, hmStr, today)
+  const mStats = monthStats(entries, hmStr)
+
+  // Month dropdown options (12 months of the viewed month's year)
+  const mYear = Number(hmStr.slice(0, 4))
+  const monthOptions = MONTHS_FULL.map((label, i) => {
+    const val = `${mYear}-${String(i + 1).padStart(2, '0')}`
+    return {
+      value: val,
+      label: `${label} ${mYear}`,
+      disabled: val > currentMonth,
+    }
+  })
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -85,21 +126,23 @@ export default async function HomePage({
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-[1160px] mx-auto px-6 py-10 space-y-6">
         <StatsBar stats={stats} />
 
-        <section>
-          <h2 className="text-sm font-medium text-stone-500 mb-3">
-            Last 53 weeks
-          </h2>
-          <HeatmapGrid weeks={weeks} today={today} />
-        </section>
-
-        <MonthCalendar
-          weeks={monthGrid}
-          monthStr={monthStr}
+        <HeatmapCard
+          mode={mode}
+          yearGrid={yGrid}
+          yearLabelOffsets={yLabels}
+          year={year}
+          currentYear={currentYear}
+          yearEntryCount={yStats.entries}
+          monthGrid={mGrid}
+          monthStr={hmStr}
           today={today}
-          canGoNext={canGoNext}
+          monthDays={mStats.daysInMonth}
+          monthEntryCount={mStats.entries}
+          monthOptions={monthOptions}
+          currentMonth={currentMonth}
         />
 
         <Link

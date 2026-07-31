@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
-import { fetchEntry } from '@/lib/entries'
+import { fetchEntry, ensureEntry } from '@/lib/entries'
 import {
   MAX_PHOTOS_PER_ENTRY,
   validatePhotoFile,
@@ -44,7 +44,7 @@ function CameraIcon() {
 }
 
 export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, children }: Props) {
-  const [loadState, setLoadState] = useState<'loading' | 'no-entry' | 'ready'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready'>('loading')
   const [entryId, setEntryId] = useState<string | null>(null)
   const [photos, setPhotos] = useState<PhotoRow[]>([])
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
@@ -80,7 +80,11 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     fetchEntry(entryDate)
       .then(async (entry) => {
         if (cancelled) return
-        if (!entry) { setLoadState('no-entry'); return }
+        if (!entry) {
+          // No entry yet — still show photo slots (entry will be created on first upload)
+          setLoadState('ready')
+          return
+        }
         setEntryId(entry.id)
         const rows = await fetchPhotos(entry.id)
         if (cancelled) return
@@ -91,7 +95,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         }
         setLoadState('ready')
       })
-      .catch(() => { if (!cancelled) setLoadState('no-entry') })
+      .catch(() => { if (!cancelled) setLoadState('ready') })
     return () => { cancelled = true }
   }, [entryDate])
 
@@ -117,7 +121,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
   const slotsRemaining = MAX_PHOTOS_PER_ENTRY - photos.length
 
   const processSingleFile = useCallback(async (file: File) => {
-    if (!entryId) return
     if (photos.length >= MAX_PHOTOS_PER_ENTRY) {
       setBatchErrors([`Maximum ${MAX_PHOTOS_PER_ENTRY} photos per entry.`])
       return
@@ -128,7 +131,14 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     if (validErr) { setBatchErrors([validErr]); return }
     setUploadProgress('Uploading…')
     try {
-      const row = await uploadPhoto(entryId, entryDate, file, timezone)
+      // Ensure entry exists before uploading (creates empty entry if needed)
+      let eid = entryId
+      if (!eid) {
+        const entry = await ensureEntry(entryDate, timezone)
+        eid = entry.id
+        setEntryId(eid)
+      }
+      const row = await uploadPhoto(eid, entryDate, file, timezone)
       const newUrls = await signPhotoUrls([row.storage_path])
       setPhotos((prev) => [...prev, row])
       setSignedUrls((prev) => ({ ...prev, ...newUrls }))
@@ -141,7 +151,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!entryId) return
       const selected = Array.from(e.target.files ?? [])
       e.target.value = ''
       if (selected.length === 0) return
@@ -157,6 +166,19 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         toProcess = selected.slice(0, slotsRemaining)
       }
 
+      // Ensure entry exists before uploading (creates empty entry if needed)
+      let eid = entryId
+      if (!eid) {
+        try {
+          const entry = await ensureEntry(entryDate, timezone)
+          eid = entry.id
+          setEntryId(eid)
+        } catch (err) {
+          setBatchErrors([err instanceof Error ? err.message : 'Failed to create entry.'])
+          return
+        }
+      }
+
       const errors: string[] = []
       for (let i = 0; i < toProcess.length; i++) {
         const file = toProcess[i]
@@ -168,7 +190,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         const validErr = validatePhotoFile(file)
         if (validErr) { errors.push(`${file.name}: ${validErr}`); continue }
         try {
-          const row = await uploadPhoto(entryId, entryDate, file, timezone)
+          const row = await uploadPhoto(eid, entryDate, file, timezone)
           const newUrls = await signPhotoUrls([row.storage_path])
           setPhotos((prev) => [...prev, row])
           setSignedUrls((prev) => ({ ...prev, ...newUrls }))
@@ -408,15 +430,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
               {mobileCards}
             </div>
           ) : null}
-          {loadState === 'ready' && !entryId && (
-            <p className="text-xs text-gray-400 italic px-1">Write something first to add photos.</p>
-          )}
           {statusMessages}
-        </div>
-      )}
-      {loadState === 'no-entry' && (
-        <div className="min-[1704px]:hidden mb-4 px-1">
-          <p className="text-xs text-gray-400 italic">Write something first to add photos.</p>
         </div>
       )}
 

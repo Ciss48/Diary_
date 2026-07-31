@@ -1,6 +1,6 @@
 'use client'
 
-import type { Change } from '@/lib/suggestions'
+import type { DiffChange } from '@/lib/diff'
 
 const TYPE_LABELS: Record<string, string> = {
   grammar: 'Grammar',
@@ -17,7 +17,7 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 interface Props {
-  changes: Change[]
+  changes: DiffChange[]
   feedback: string
   contentDrifted: boolean
   selectedChange: number | null
@@ -56,22 +56,26 @@ export default function SuggestionDetails({
                 }`}
               >
                 <div className="flex items-start gap-2 flex-wrap">
-                  <span className="text-sm text-gray-500 line-through shrink-0">
-                    {change.original}
-                  </span>
+                  {change.original && (
+                    <span className="text-sm text-gray-500 line-through shrink-0">
+                      {change.original}
+                    </span>
+                  )}
                   <span className="text-sm text-gray-400 shrink-0">→</span>
                   <span className="text-sm font-medium text-gray-800 shrink-0">
                     {change.corrected}
                   </span>
                   <span
                     className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      TYPE_COLORS[change.type] ?? 'bg-gray-100 text-gray-600'
+                      change.type ? (TYPE_COLORS[change.type] ?? 'bg-gray-100 text-gray-600') : 'bg-gray-100 text-gray-600'
                     }`}
                   >
-                    {TYPE_LABELS[change.type] ?? change.type}
+                    {change.type ? (TYPE_LABELS[change.type] ?? change.type) : 'Change'}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">{change.explanation}</p>
+                {change.explanation && (
+                  <p className="mt-1 text-xs text-gray-500">{change.explanation}</p>
+                )}
               </li>
             ))}
           </ol>

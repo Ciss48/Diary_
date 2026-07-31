@@ -29,6 +29,13 @@ Rules:
 - Every "corrected" value MUST appear verbatim as a substring of
   "corrected_version". The interface depends on this to highlight it.
 - Keep each fragment short: a word or a phrase, never a whole paragraph.
+- List EVERY change you made, no matter how small. If you changed a single
+  preposition, article, or punctuation mark, it must appear in the changes
+  array. Under-reporting changes is the single most common failure mode —
+  err on the side of listing too many rather than too few.
+- The corrected_version must contain the same paragraph structure as the input:
+  same number of paragraphs, separated by the same blank lines. Never merge
+  paragraphs.
 - If a sentence is already correct, do not invent a change for it. An empty
   changes array is a valid answer.
 - Match the length of "overall_feedback" to the entry: two or three sentences
