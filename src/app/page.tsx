@@ -2,10 +2,11 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SignOutButton from '@/components/SignOutButton'
+import ThemeToggle from '@/components/ThemeToggle'
 import StatsBar from '@/components/StatsBar'
 import HeatmapCard from '@/components/HeatmapCard'
 import { getTodayInTimezone } from '@/lib/dates'
-import { computeStats } from '@/lib/streaks'
+import { computeStats, previousDay } from '@/lib/streaks'
 import type { EntryLite } from '@/lib/streaks'
 import {
   isValidMonthString,
@@ -22,6 +23,24 @@ const MONTHS_FULL = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ]
+
+const SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+function formatGreetingDate(today: string): string {
+  const [y, m, d] = today.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  const dayName = WEEKDAYS[dt.getUTCDay()]
+  return `${dayName}, ${MONTHS_FULL[m - 1]} ${d}, ${y}`
+}
+
+function getGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
 export default async function HomePage({
   searchParams,
@@ -57,10 +76,8 @@ export default async function HomePage({
 
   const mode: 'year' | 'month' = rawHView === 'month' ? 'month' : 'year'
 
-  // Year mode: validate & clamp
   const year = isValidYear(rawYear, currentYear) ?? currentYear
 
-  // Month mode: validate & clamp
   let hmStr: string
   if (rawHm && isValidMonthString(rawHm) && rawHm <= currentMonth) {
     hmStr = rawHm
@@ -92,7 +109,7 @@ export default async function HomePage({
   const mGrid = buildMonthGrid(entries, hmStr, today)
   const mStats = monthStats(entries, hmStr)
 
-  // Month dropdown options (12 months of the viewed month's year)
+  // Month dropdown options
   const mYear = Number(hmStr.slice(0, 4))
   const monthOptions = MONTHS_FULL.map((label, i) => {
     const val = `${mYear}-${String(i + 1).padStart(2, '0')}`
@@ -103,32 +120,116 @@ export default async function HomePage({
     }
   })
 
+  // ── Beads for last 7 days ─────────────────────────────────────────────
+  const byDate = new Map<string, EntryLite>()
+  for (const e of entries) byDate.set(e.date, e)
+
+  const beads: { state: 'ontime' | 'backfill' | 'empty'; label: string }[] = []
+  let beadDate = today
+  for (let i = 6; i >= 0; i--) {
+    const d = i === 0 ? today : (() => {
+      let dd = today
+      for (let j = 0; j < i; j++) dd = previousDay(dd)
+      return dd
+    })()
+    const entry = byDate.get(d)
+    const m = Number(d.slice(5, 7)) - 1
+    const day = Number(d.slice(8, 10))
+    beads.push({
+      state: entry ? (entry.isBackfill ? 'backfill' : 'ontime') : 'empty',
+      label: `${SHORT[m]} ${day}`,
+    })
+  }
+  // beads is built oldest-first (6 days ago → today) which matches the reference
+
+  // ── Earliest date + longest range ─────────────────────────────────────
+  const sortedDates = entries.map(e => e.date).sort()
+  const earliestDate = sortedDates.length > 0 ? sortedDates[0] : null
+
+  // Compute longest streak range for display
+  const ontimeDates = entries
+    .filter(e => !e.isBackfill)
+    .map(e => e.date)
+    .sort()
+
+  let longestRange: string | null = null
+  if (ontimeDates.length > 0 && stats.longestStreak > 0) {
+    let bestLen = 0
+    let bestStart = ''
+    let bestEnd = ''
+    let runLen = 1
+    let runStart = ontimeDates[0]
+    let prev = ontimeDates[0]
+
+    for (let i = 1; i < ontimeDates.length; i++) {
+      const d = ontimeDates[i]
+      const expected = (() => {
+        const [y, m, dd] = prev.split('-').map(Number)
+        const ms = Date.UTC(y, m - 1, dd) + 86400000
+        const dt = new Date(ms)
+        return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+      })()
+      if (d === expected) {
+        runLen++
+      } else {
+        if (runLen > bestLen) {
+          bestLen = runLen
+          bestStart = runStart
+          bestEnd = prev
+        }
+        runLen = 1
+        runStart = d
+      }
+      prev = d
+    }
+    if (runLen > bestLen) {
+      bestLen = runLen
+      bestStart = runStart
+      bestEnd = prev
+    }
+
+    if (bestLen > 1) {
+      const [sy, sm, sd] = bestStart.split('-').map(Number)
+      const [ey, em, ed] = bestEnd.split('-').map(Number)
+      longestRange = `${SHORT[sm - 1]} ${sd} \u2013 ${SHORT[em - 1]} ${ed}, ${ey}`
+    }
+  }
+
+  // ── Display name ──────────────────────────────────────────────────────
+  const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? ''
+  const dateLabel = formatGreetingDate(today).toUpperCase()
+  const greeting = getGreeting()
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Diary</h1>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {profile?.avatar_url && (
-              <img
-                src={profile.avatar_url}
-                alt=""
-                width={32}
-                height={32}
-                className="rounded-full"
-              />
-            )}
-            <span className="text-sm text-gray-700">
-              {profile?.display_name ?? user.email}
+    <div className="min-h-screen">
+      <div
+        className="an-rise max-w-[1500px] mx-auto px-[18px] sm:px-10 py-[22px] sm:py-[34px] pb-[60px] sm:pb-[72px] flex flex-col gap-[26px]"
+      >
+        {/* Header */}
+        <div className="flex items-end justify-between gap-[18px] flex-wrap">
+          <div className="flex flex-col gap-[6px]">
+            <span className="text-[10.5px] font-medium tracking-[.16em] text-ink-3 uppercase">
+              {dateLabel}
             </span>
+            <h1 className="m-0 font-serif text-[24px] sm:text-[31px] font-medium tracking-tight">
+              {greeting}, {displayName}
+            </h1>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
         </div>
-      </header>
 
-      <div className="max-w-[1160px] mx-auto px-6 py-10 space-y-6">
-        <StatsBar stats={stats} />
+        {/* Stats */}
+        <StatsBar
+          stats={stats}
+          beads={beads}
+          earliestDate={earliestDate}
+          longestRange={longestRange}
+        />
 
+        {/* Heatmap */}
         <HeatmapCard
           mode={mode}
           yearGrid={yGrid}
@@ -145,13 +246,19 @@ export default async function HomePage({
           currentMonth={currentMonth}
         />
 
-        <Link
-          href={`/diary/${today}`}
-          className="inline-block bg-gray-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          Write today&apos;s entry
-        </Link>
+        {/* CTA */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <Link
+            href={`/diary/${today}`}
+            className="hv-lift inline-block border-0 cursor-pointer bg-wax text-white font-sans text-[14.5px] font-medium px-6 py-[14px] rounded-[11px] shadow-[var(--shadow-2)] hover:text-white"
+          >
+            Write today&apos;s entry
+          </Link>
+          <span className="font-serif italic text-[14px] text-ink-3">
+            Keep the chain going — day {stats.currentStreak + 1} is one page away.
+          </span>
+        </div>
       </div>
-    </main>
+    </div>
   )
 }

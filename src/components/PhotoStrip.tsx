@@ -22,49 +22,24 @@ interface Props {
   children: ReactNode
 }
 
-// Camera icon SVG (inline, no external dep)
-function CameraIcon() {
-  return (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="m21 15-5-5L5 21" />
-    </svg>
-  )
-}
-
 export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, children }: Props) {
   const [loadState, setLoadState] = useState<'loading' | 'ready'>('loading')
   const [entryId, setEntryId] = useState<string | null>(null)
   const [photos, setPhotos] = useState<PhotoRow[]>([])
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
 
-  // Upload state
   const [uploadProgress, setUploadProgress] = useState<string | null>(null)
   const [batchErrors, setBatchErrors] = useState<string[]>([])
   const [slotWarning, setSlotWarning] = useState<string | null>(null)
 
-  // Drag-over tracking (mobile strip + desktop empty slots)
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null)
   const [dragOverStrip, setDragOverStrip] = useState(false)
 
-  // Lightbox
   const [lightboxPhoto, setLightboxPhoto] = useState<PhotoRow | null>(null)
   const [captionVal, setCaptionVal] = useState('')
   const [takenAtVal, setTakenAtVal] = useState('')
   const [metaSaveStatus, setMetaSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  // Delete
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -81,7 +56,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
       .then(async (entry) => {
         if (cancelled) return
         if (!entry) {
-          // No entry yet — still show photo slots (entry will be created on first upload)
           setLoadState('ready')
           return
         }
@@ -117,7 +91,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     }
   }, [lightboxPhoto?.id, photos]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Single-file upload (reuses Phase 5 validate→compress→upload path) ───────
+  // ── Single-file upload ──────────────────────────────────────────────────────
   const slotsRemaining = MAX_PHOTOS_PER_ENTRY - photos.length
 
   const processSingleFile = useCallback(async (file: File) => {
@@ -131,7 +105,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     if (validErr) { setBatchErrors([validErr]); return }
     setUploadProgress('Uploading…')
     try {
-      // Ensure entry exists before uploading (creates empty entry if needed)
       let eid = entryId
       if (!eid) {
         const entry = await ensureEntry(entryDate, timezone)
@@ -166,7 +139,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         toProcess = selected.slice(0, slotsRemaining)
       }
 
-      // Ensure entry exists before uploading (creates empty entry if needed)
       let eid = entryId
       if (!eid) {
         try {
@@ -258,23 +230,16 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     },
   })
 
-  // ── Shared polaroid card styles ─────────────────────────────────────────────
-  const cardBase =
-    'relative bg-white rounded-lg p-2 transition-all duration-200 select-none'
-  const cardFilled = `${cardBase} shadow-md cursor-pointer hover:shadow-xl`
-  const cardEmpty = `${cardBase} border-2 border-dashed cursor-pointer`
-
   // ── Filled photo card ───────────────────────────────────────────────────────
-  // clampH=true adds a max-height on the image so two stacked cards fit the editor height
   const renderFilledCard = (photo: PhotoRow, index: number, extraClass = '', clampH = false) => {
     const url = signedUrls[photo.storage_path] ?? ''
     const angle = photoAngle(photo.id)
     return (
       <div
         key={photo.id}
-        className={`${cardFilled} group ${extraClass}`}
+        className={`hv-photo relative bg-card rounded-[3px] p-2.5 shadow-[var(--shadow-2)] cursor-pointer select-none group ${extraClass}`}
         style={{ transform: `rotate(${angle}deg)` }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'rotate(0deg) translateY(-4px)' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'rotate(0deg) scale(1.05)' }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = `rotate(${angle}deg)` }}
         onClick={() => {
           setLightboxPhoto(photo)
@@ -283,31 +248,30 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
           setMetaSaveStatus('idle')
         }}
       >
-        {/* Image — max-h clamps to half editor height minus padding/gap/caption */}
-        <div className={`aspect-[4/5] overflow-hidden rounded-sm bg-gray-100${clampH ? ' max-h-[calc(45vh-5.25rem)]' : ''}`}>
+        <div className={`overflow-hidden rounded-[2px] bg-paper-2${clampH ? ' max-h-[calc(45vh-5.25rem)]' : ''}`}
+          style={{ aspectRatio: '4/5' }}>
           {url ? (
             <img
               src={url}
               alt={photo.caption ?? ''}
               width={photo.width ?? undefined}
               height={photo.height ?? undefined}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover block"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-200">
+            <div className="w-full h-full flex items-center justify-center text-ink-3">
               <CameraIcon />
             </div>
           )}
         </div>
-        {/* Caption + time */}
         <div className="flex items-start justify-between mt-1.5 px-0.5 min-h-[1.25rem]">
           {photo.caption ? (
-            <span className="text-[11px] text-gray-400 italic truncate">{photo.caption}</span>
+            <span className="font-serif text-[13px] text-ink-3 truncate">{photo.caption}</span>
           ) : (
             <span />
           )}
           {photo.taken_at ? (
-            <span className="text-[11px] text-gray-400 ml-2 shrink-0 tabular-nums">{photo.taken_at}</span>
+            <span className="font-mono text-[13px] text-ink-3 ml-2 shrink-0">{photo.taken_at}</span>
           ) : null}
         </div>
         {/* Delete button */}
@@ -321,6 +285,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
             'bg-black/60 text-white text-xs leading-none',
             'flex items-center justify-center',
             'opacity-0 group-hover:opacity-100 transition-opacity',
+            'cursor-pointer border-0',
             deletingId === photo.id ? 'cursor-wait' : '',
           ].join(' ')}
         >
@@ -338,18 +303,28 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     return (
       <div
         key={key}
-        className={`${cardEmpty} ${isDragOver ? 'border-gray-400 bg-gray-50' : 'border-gray-200 hover:border-gray-300'} ${extraClass}`}
+        className={[
+          'relative bg-card rounded-[3px] p-2.5 select-none cursor-pointer',
+          'border border-dashed transition-all duration-300',
+          isDragOver ? 'border-ink bg-paper-2' : 'border-line-2 hover:border-ink-3',
+          extraClass,
+        ].join(' ')}
         style={{ transform: `rotate(${angle}deg)` }}
         onClick={() => { if (slotsRemaining > 0 && uploadProgress === null) fileInputRef.current?.click() }}
         {...dragHandlers}
       >
-        <div className={`aspect-[4/5] flex flex-col items-center justify-center gap-1.5 text-gray-300 rounded-sm${clampH ? ' max-h-[calc(45vh-5.25rem)]' : ''}`}>
-          <CameraIcon />
-          <span className="text-[11px] font-medium">Add a photo</span>
-          <span className="text-[11px]">or <u className="underline-offset-2">browse files</u></span>
+        <div
+          className={`flex flex-col items-center justify-center gap-2 bg-paper-2 rounded-[2px]${clampH ? ' max-h-[calc(45vh-5.25rem)]' : ''}`}
+          style={{ aspectRatio: '4/5' }}
+        >
+          <span className="font-serif italic text-[15px] text-ink-3">Drop a photo</span>
+          <span className="text-[11.5px] text-ink-3">
+            or <a href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileInputRef.current?.click() }}>browse files</a>
+          </span>
         </div>
-        {/* Spacer matching caption row height */}
-        <div className="h-5 mt-1.5" />
+        <div className="font-serif text-[13px] text-ink-3 pt-[9px] px-0.5 pb-[3px]">
+          Slot {slotIndex + 1} of {MAX_PHOTOS_PER_ENTRY}
+        </div>
       </div>
     )
   }
@@ -361,7 +336,6 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
   for (let i = 0; i < MAX_PHOTOS_PER_ENTRY; i++) {
     const slot = photoSlot(i)
     const photo = photos[i]
-    // max-w-[300px] w-full bounds the card; clampH=true keeps two cards within editor height
     const node = photo
       ? renderFilledCard(photo, i, 'max-w-[300px] w-full', true)
       : (slotsRemaining > 0 ? renderEmptySlot(i, `empty-${i}`, 'max-w-[300px] w-full', true) : null)
@@ -370,7 +344,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     else rightGutter.push(node)
   }
 
-  // ── Mobile strip cards (all photos + add button if capacity remains) ─────────
+  // ── Mobile strip cards ──────────────────────────────────────────────────────
   const mobileCards: ReactNode[] = photos.map((photo, i) =>
     <div key={photo.id} className="snap-start shrink-0 w-[65vw] max-w-[360px]">
       {renderFilledCard(photo, i, 'w-full')}
@@ -391,19 +365,19 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
     )
   }
 
-  // ── Status messages (shared between mobile + desktop) ───────────────────────
+  // ── Status messages ─────────────────────────────────────────────────────────
   const statusMessages = (
     <>
       {uploadProgress && (
-        <p className="mt-2 text-xs text-gray-400">{uploadProgress}</p>
+        <p className="mt-2 text-[12px] text-ink-3">{uploadProgress}</p>
       )}
       {slotWarning && (
-        <p className="mt-2 text-xs text-amber-600">{slotWarning}</p>
+        <p className="mt-2 text-[12px] text-brass">{slotWarning}</p>
       )}
       {batchErrors.length > 0 && (
         <ul className="mt-2 space-y-0.5">
           {batchErrors.map((err, i) => (
-            <li key={i} className="text-xs text-red-500">{err}</li>
+            <li key={i} className="text-[12px] text-wax">{err}</li>
           ))}
         </ul>
       )}
@@ -413,18 +387,16 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Mobile / tablet: horizontal scroll strip (hidden when 3-col layout fits) ─── */}
+      {/* Mobile / tablet: horizontal scroll strip */}
       {loadState === 'ready' && (
         <div className="min-[1704px]:hidden mb-4">
           {mobileCards.length > 0 ? (
-            /* Extra px-4 + negative mx-4 so box-shadows aren't clipped */
             <div
               className={[
                 'flex gap-4 overflow-x-auto snap-x scroll-smooth',
                 'px-4 -mx-4 pb-4',
-                /* No clip: allow shadows to show beyond the scroll container */
                 '[overflow-clip-margin:0]',
-                dragOverStrip ? 'bg-gray-50 rounded-lg' : '',
+                dragOverStrip ? 'bg-paper-2 rounded-lg' : '',
               ].join(' ')}
             >
               {mobileCards}
@@ -434,14 +406,7 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         </div>
       )}
 
-      {/* ── Desktop: 3-column grid (≥1704px) ────────────────────────────────────
-           Breakpoint derivation:
-             editor max-w-5xl (64rem = 1024px)
-           + 2 gutters × 300px = 600px
-           + 2 gaps × 24px    = 48px
-           + outer px-4 × 2   = 32px
-           = 1704px
-      ─────────────────────────────────────────────────────────────────────── */}
+      {/* Desktop: 3-column grid (≥1704px) */}
       <div className={[
         'min-[1704px]:grid',
         'min-[1704px]:grid-cols-[minmax(0,300px)_minmax(0,64rem)_minmax(0,300px)]',
@@ -451,21 +416,20 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
         'min-[1704px]:px-4',
       ].join(' ')}>
 
-        {/* Left gutter — hidden below breakpoint */}
+        {/* Left gutter */}
         <div className="hidden min-[1704px]:flex flex-col gap-4 items-end pt-1">
           {loadState === 'ready' ? leftGutter : null}
         </div>
 
-        {/* Center column — always visible */}
+        {/* Center column */}
         <div className="min-w-0">
           {children}
-          {/* Status messages for desktop (below the center content) */}
           <div className="hidden min-[1704px]:block">
             {loadState === 'ready' && statusMessages}
           </div>
         </div>
 
-        {/* Right gutter — hidden below breakpoint */}
+        {/* Right gutter */}
         <div className="hidden min-[1704px]:flex flex-col gap-4 pt-1">
           {loadState === 'ready' ? rightGutter : null}
         </div>
@@ -495,18 +459,19 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
             type="button"
             onClick={() => setLightboxPhoto(null)}
             aria-label="Close photo viewer"
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-black/50 text-white text-xl hover:bg-black/70"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full
+              bg-black/50 text-white text-xl hover:bg-black/70 cursor-pointer border-0"
           >
             ×
           </button>
 
-          {/* Image — click doesn't propagate to backdrop */}
+          {/* Image */}
           <img
             src={signedUrls[lightboxPhoto.storage_path] ?? ''}
             alt={lightboxPhoto.caption ?? ''}
             width={lightboxPhoto.width ?? undefined}
             height={lightboxPhoto.height ?? undefined}
-            className="max-h-[70vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+            className="max-h-[70vh] max-w-[90vw] object-contain rounded-lg shadow-[var(--shadow-3)]"
             onClick={(e) => e.stopPropagation()}
           />
 
@@ -523,7 +488,8 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
               onChange={(e) => setCaptionVal(e.target.value)}
               onBlur={() => void handleMetaSave()}
               onKeyDown={handleMetaKeyDown}
-              className="flex-1 rounded-lg border border-gray-600 bg-black/40 text-white placeholder:text-gray-500 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400"
+              className="flex-1 rounded-lg border border-ink-3/40 bg-black/40 text-white placeholder:text-ink-3
+                px-3 py-2 text-sm font-serif focus:outline-none focus:ring-1 focus:ring-brass"
             />
             <input
               type="time"
@@ -531,9 +497,10 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
               onChange={(e) => setTakenAtVal(e.target.value)}
               onBlur={() => void handleMetaSave()}
               onKeyDown={handleMetaKeyDown}
-              className="rounded-lg border border-gray-600 bg-black/40 text-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 w-full sm:w-auto"
+              className="rounded-lg border border-ink-3/40 bg-black/40 text-white font-mono
+                px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brass w-full sm:w-auto"
             />
-            <span className="text-xs text-gray-400 shrink-0 self-center">
+            <span className="text-[12px] text-ink-3 shrink-0 self-center">
               {metaSaveStatus === 'saving' ? 'Saving…' : metaSaveStatus === 'saved' ? 'Saved ✓' : ''}
             </span>
           </div>
@@ -543,12 +510,32 @@ export default function PhotoStrip({ entryDate, timezone, onPhotoCountChange, ch
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleDelete(lightboxPhoto) }}
             disabled={deletingId === lightboxPhoto.id}
-            className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+            className="text-[12px] text-ink-3 hover:text-wax transition-colors cursor-pointer bg-transparent border-0"
           >
             {deletingId === lightboxPhoto.id ? 'Deleting…' : 'Delete photo'}
           </button>
         </div>
       )}
     </>
+  )
+}
+
+function CameraIcon() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </svg>
   )
 }

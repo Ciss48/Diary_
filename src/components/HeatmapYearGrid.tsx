@@ -14,12 +14,12 @@ export default function HeatmapYearGrid({ weeks, labelOffsets, today }: Props) {
   const cells = weeks.flat()
 
   return (
-    <div className="flex flex-col gap-2 overflow-x-auto">
+    <div className="an-rise flex flex-col gap-[7px] overflow-x-auto">
       {/* Month labels */}
-      <div className="flex gap-2.5 min-w-[640px]">
-        <div className="w-7 shrink-0" />
+      <div className="flex gap-[9px] min-w-[720px]">
+        <div className="w-[30px] shrink-0" />
         <div
-          className="flex-1 grid text-[11px] text-stone-400"
+          className="flex-1 grid text-[10.5px] tracking-[.06em] text-ink-3"
           style={{ gridTemplateColumns: `repeat(${weekCount}, 1fr)` }}
         >
           {labelOffsets.map(({ month, weekIndex }) => (
@@ -34,10 +34,10 @@ export default function HeatmapYearGrid({ weeks, labelOffsets, today }: Props) {
       </div>
 
       {/* Grid with weekday labels */}
-      <div className="flex gap-2.5 min-w-[640px]">
-        <div className="w-7 shrink-0 grid grid-rows-7 gap-[3px] text-[10.5px] text-stone-400">
-          {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
-            <span key={i} className="leading-none">{d}</span>
+      <div className="flex gap-[9px] min-w-[720px]">
+        <div className="w-[30px] shrink-0 grid grid-rows-7 gap-[3px] text-[10px] text-ink-3 items-center">
+          {['MON', '', 'WED', '', 'FRI', '', 'SUN'].map((d, i) => (
+            <span key={i}>{d}</span>
           ))}
         </div>
         <div
@@ -46,34 +46,40 @@ export default function HeatmapYearGrid({ weeks, labelOffsets, today }: Props) {
         >
           {cells.map((cell, i) => {
             if (!cell.inYear) {
-              return <div key={i} className="aspect-square" />
+              return <div key={i} />
             }
 
             const isToday = cell.date === today
+            const isFuture = cell.state === 'future'
 
-            const bg =
-              cell.state === 'future' ? 'bg-stone-100 opacity-40' :
-              cell.state === 'ontime' ? 'bg-emerald-500' :
-              cell.state === 'backfill' ? 'bg-emerald-300' :
-              'bg-stone-200'
-
-            const ring = isToday ? 'ring-1 ring-amber-500' : ''
+            const style: React.CSSProperties = {
+              background:
+                isFuture ? 'var(--future)' :
+                cell.state === 'ontime' ? 'var(--leaf)' :
+                cell.state === 'backfill' ? 'var(--backfill-fill)' :
+                'var(--empty)',
+              border: isFuture ? '1px dashed var(--line-2)' : '1px solid transparent',
+              boxShadow: isToday ? '0 0 0 2px var(--brass)' : 'none',
+              cursor: isFuture ? 'default' : 'pointer',
+              opacity: isFuture ? 0.6 : 1,
+            }
 
             const m = Number(cell.date.slice(5, 7)) - 1
             const d = Number(cell.date.slice(8, 10))
             const tip = `${SHORT[m]} ${d}, ${cell.date.slice(0, 4)}` +
-              (cell.state === 'ontime' ? ` · ${cell.wordCount} words` :
-               cell.state === 'backfill' ? ` · ${cell.wordCount} words (backfilled)` :
-               cell.state === 'future' ? ' · upcoming' : ' · no entry')
+              (cell.state === 'ontime' ? ` · ${cell.wordCount} words · on time` :
+               cell.state === 'backfill' ? ` · ${cell.wordCount} words · backfilled` :
+               isFuture ? ' · upcoming' : ' · no entry')
 
             const el = (
               <div
-                className={`aspect-square rounded-[3px] ${bg} ${ring} box-border transition-transform duration-100 hover:scale-[1.35]`}
+                className="hv-cell aspect-square rounded-[3.5px] box-border"
+                style={style}
                 title={tip}
               />
             )
 
-            if (cell.state === 'future') {
+            if (isFuture) {
               return <div key={i} className="pointer-events-none">{el}</div>
             }
 

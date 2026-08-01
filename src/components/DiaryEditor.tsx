@@ -31,23 +31,17 @@ function formatDate(dateStr: string): string {
   })
 }
 
-// Thin, muted scrollbar — matches ImprovedVersionPane so both panes look identical.
+// Thin, muted scrollbar for both panes.
 const SCROLLBAR =
   '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent ' +
-  '[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 ' +
+  '[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-ink-3/30 ' +
   '[scrollbar-width:thin]'
 
-// Shared textarea base (no sizing).
-const TEXTAREA_BASE =
-  'resize-none rounded-lg border border-gray-200 bg-white px-5 py-4 ' +
-  'text-gray-800 text-base leading-relaxed placeholder:text-gray-300 ' +
-  `focus:outline-none focus:ring-2 focus:ring-gray-300 overflow-y-auto ${SCROLLBAR}`
-
-// Single-column: fixed height matching two-column mode so layout never jumps.
-const TEXTAREA_SINGLE = `w-full h-[60vh] min-h-[400px] ${TEXTAREA_BASE}`
-
-// Two-column left pane: fills the flex container (flex-1 + min-h-0 prevents overflow).
-const TEXTAREA_COLUMN = `flex-1 min-h-0 ${TEXTAREA_BASE}`
+const PROMPTS = [
+  ['What surprised me today', 'What surprised me today was '],
+  ['One person I talked to', 'Today I talked to '],
+  ['Something I want to fix', 'One thing I want to fix is '],
+]
 
 export default function DiaryEditor({ date, timezone, initialSuggestion, initialRemaining }: Props) {
   // ── Entry state ──────────────────────────────────────────────────────────
@@ -72,8 +66,6 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
   const [sugLoading, setSugLoading] = useState(false)
   const [sugError, setSugError] = useState<string | null>(null)
   const [selectedChange, setSelectedChange] = useState<number | null>(null)
-  // dismissed = true hides the two-column view without deleting the suggestion.
-  // Refreshing resets this to false so the persisted suggestion reappears.
   const [dismissed, setDismissed] = useState(false)
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -188,53 +180,57 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
     }
   }, [date])
 
-  // Toggle: clicking the same index deselects; clicking a new one selects it.
   const handleSelectChange = useCallback((idx: number) => {
     setSelectedChange((prev) => (prev === idx ? null : idx))
+  }, [])
+
+  const handleSetContent = useCallback((text: string) => {
+    setContent(text)
+    setWordCount(countWords(text))
   }, [])
 
   // ── Loading screen ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading…</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="font-serif italic text-ink-3 text-[15px]">Loading…</p>
       </div>
     )
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+  const blank = content.trim().length === 0
+
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen">
       <div className="mx-auto px-4 xl:px-8 py-10">
-        {/* Header — full width, above the photo scatter layout */}
-        <div className="mb-6 flex items-start justify-between gap-4 max-w-5xl xl:mx-auto">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{formatDate(date)}</h1>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        {/* Header — full width */}
+        <div className="mb-5 flex items-start justify-between gap-4 max-w-5xl xl:mx-auto flex-wrap">
+          <div className="flex flex-col gap-[11px]">
+            <h1 className="m-0 font-serif text-[24px] sm:text-[31px] font-medium tracking-tight">
+              {formatDate(date)}
+            </h1>
+            <div className="flex items-center gap-2.5 flex-wrap">
               {(isBackfill || isBackfillDate) && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                  backfilled
+                <span className="text-[11px] font-medium tracking-[.1em] text-wax bg-wax-soft border border-wax rounded-full px-2.5 py-[3px] uppercase">
+                  BACKFILLED
                 </span>
               )}
               <MoodPicker value={mood} onChange={handleMoodChange} />
               {photoCount > 0 && (
-                <span className="text-sm text-gray-500">
-                  {photoCount} {photoCount === 1 ? 'photo' : 'photos'} · {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                <span className="text-[12.5px] text-ink-3">
+                  {photoCount} {photoCount === 1 ? 'photo' : 'photos'}
                 </span>
               )}
             </div>
           </div>
-          <a
-            href="/"
-            className="text-sm text-gray-400 hover:text-gray-600 shrink-0 mt-1"
-          >
-            ← Home
-          </a>
+          <div className="flex items-center gap-4 shrink-0 mt-1">
+            <SaveIndicator status={saveStatus} onRetry={handleRetry} />
+            <a href="/" className="text-[14px] text-ink-3">← Home</a>
+          </div>
         </div>
 
-        {/* PhotoStrip provides the 3-column scatter layout on xl+
-            and a horizontal scroll strip on smaller screens.
-            All editor content is passed as children → center column. */}
+        {/* PhotoStrip provides 3-column scatter on xl+ */}
         <PhotoStrip
           entryDate={date}
           timezone={timezone}
@@ -242,30 +238,33 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
         >
           {/* ── Editor area ───────────────────────────────────────── */}
           {hasSuggestionVisible ? (
-            // Two-column: fixed height on desktop, children fill it.
-            // Mobile: single-column stack; each child owns its own height (h-[45vh]).
-            <div className="grid md:grid-cols-2 gap-4 md:h-[60vh] md:min-h-[400px] overflow-hidden">
-              {/* Left column: flex column so header + textarea fill the space */}
+            <div className="an-rise grid md:grid-cols-2 gap-[18px] md:h-[60vh] md:min-h-[400px] overflow-hidden">
+              {/* Left column */}
               <div className="flex flex-col h-[45vh] md:h-full min-h-0">
-                <div className="flex items-center justify-between mb-2 shrink-0">
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                    Your Entry
+                <div className="flex items-baseline justify-between mb-2 shrink-0">
+                  <span className="text-[10.5px] font-medium tracking-[.15em] text-ink-3 uppercase">
+                    YOUR ENTRY
                   </span>
-                  <span className="text-xs text-gray-400">
-                    {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                  <span className="font-mono text-[12px] text-ink-3">
+                    {wordCount} words
                   </span>
                 </div>
-                <textarea
-                  value={content}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="Write your diary entry here…"
-                  className={TEXTAREA_COLUMN}
-                  spellCheck
-                />
+                <PaperSurface spine="wax" className="flex-1 min-h-0 flex flex-col">
+                  <textarea
+                    value={content}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Write your diary entry here…"
+                    spellCheck
+                    className={`flex-1 min-h-0 w-full resize-none bg-transparent border-0 outline-none
+                      pl-[44px] sm:pl-[44px] pr-[26px] py-[26px]
+                      font-serif text-[16.5px] sm:text-[17.5px] leading-[1.78] text-ink
+                      caret-wax overflow-y-auto ${SCROLLBAR}`}
+                  />
+                </PaperSurface>
               </div>
 
-              {/* Right column: key forces remount on new suggestion → scrolls to top */}
+              {/* Right column */}
               <ImprovedVersionPane
                 key={suggestion.id}
                 segments={segments}
@@ -277,18 +276,24 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
               />
             </div>
           ) : (
-            // Single column: same fixed height as two-column mode → no layout jump.
-            <textarea
-              value={content}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              placeholder="Write your diary entry here…"
-              className={TEXTAREA_SINGLE}
-              spellCheck
-            />
+            <div className="an-rise">
+              <PaperSurface spine="wax" className="relative" showEmptyState={blank} onPromptClick={handleSetContent}>
+                <textarea
+                  value={content}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  placeholder="Write your diary entry here…"
+                  spellCheck
+                  className={`relative w-full h-[60vh] min-h-[400px] resize-none bg-transparent border-0 outline-none
+                    pl-[26px] sm:pl-[44px] pr-[34px] py-[34px]
+                    font-serif text-[16.5px] sm:text-[17.5px] leading-[1.78] text-ink
+                    caret-wax overflow-y-auto ${SCROLLBAR}`}
+                />
+              </PaperSurface>
+            </div>
           )}
 
-          {/* Suggest button + counter + error/loading state */}
+          {/* Suggest button + counter */}
           <SuggestionPanel
             loading={sugLoading}
             error={sugError}
@@ -297,7 +302,7 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
             onRequest={handleSuggestRequest}
           />
 
-          {/* Changes list + feedback — full width, only when two-column view is active */}
+          {/* Changes list + feedback */}
           {hasSuggestionVisible && (
             <SuggestionDetails
               changes={diffChanges}
@@ -310,30 +315,101 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
 
           {/* Footer */}
           <div className="flex items-center justify-between mt-3 px-1">
-            {/* Word count lives in the left column header when two columns are showing */}
             {hasSuggestionVisible ? (
               <span />
             ) : (
-              <span className="text-xs text-gray-400">
-                {wordCount} {wordCount === 1 ? 'word' : 'words'}
+              <span className="font-mono text-[12.5px] text-ink-3">
+                {wordCount} words
               </span>
             )}
-            <span className="text-xs">
-              {saveStatus === 'saving' && (
-                <span className="text-gray-400">Saving…</span>
-              )}
-              {saveStatus === 'saved' && (
-                <span className="text-green-600">Saved</span>
-              )}
-              {saveStatus === 'error' && (
-                <button onClick={handleRetry} className="text-red-500 hover:underline">
-                  Error — retry
-                </button>
-              )}
-            </span>
+            {!hasSuggestionVisible && (
+              <SaveIndicator status={saveStatus} onRetry={handleRetry} />
+            )}
           </div>
         </PhotoStrip>
       </div>
     </main>
+  )
+}
+
+// ── Paper surface card ──────────────────────────────────────────────────────
+
+function PaperSurface({
+  spine,
+  className = '',
+  children,
+  showEmptyState,
+  onPromptClick,
+}: {
+  spine: 'wax' | 'leaf'
+  className?: string
+  children: React.ReactNode
+  showEmptyState?: boolean
+  onPromptClick?: (text: string) => void
+}) {
+  const spineColor = spine === 'wax' ? 'bg-wax' : 'bg-leaf'
+  const ruleColor = spine === 'wax' ? 'bg-wax' : 'bg-leaf'
+
+  return (
+    <div
+      className={`relative rounded-[4px] bg-card border border-line shadow-[var(--shadow-2)] overflow-hidden ${className}`}
+      style={{ backgroundImage: 'var(--grain)' }}
+    >
+      {/* Spine */}
+      <span className={`absolute left-0 top-0 bottom-0 w-1 ${spineColor}`} />
+      {/* Margin rule */}
+      <span
+        className={`absolute top-0 bottom-0 w-px ${ruleColor} opacity-[.22]`}
+        style={{ left: '30px' }}
+      />
+      {children}
+      {/* Empty state overlay */}
+      {showEmptyState && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-[18px] pointer-events-none p-10 text-center">
+          <span className="font-serif italic text-[21px] text-ink-3 max-w-[34ch] leading-[1.5]" style={{ textWrap: 'pretty' as string }}>
+            The page is waiting. Three sentences count as a day.
+          </span>
+          <div className="flex gap-2 flex-wrap justify-center pointer-events-auto">
+            {PROMPTS.map(([label, seed]) => (
+              <button
+                key={label}
+                onClick={() => onPromptClick?.(seed)}
+                className="border border-dashed border-line-2 bg-transparent text-ink-2
+                  font-serif italic text-[14px] px-[15px] py-[9px] rounded-full cursor-pointer
+                  transition-all duration-[180ms] hover:border-ink hover:text-ink"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Save status indicator ───────────────────────────────────────────────────
+
+function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry: () => void }) {
+  return (
+    <span className="flex items-center gap-[7px] text-[12.5px] text-ink-3">
+      {status === 'saving' && (
+        <>
+          <span className="an-pulse w-[7px] h-[7px] rounded-full bg-leaf" />
+          Saving…
+        </>
+      )}
+      {status === 'saved' && (
+        <>
+          <span className="an-pulse w-[7px] h-[7px] rounded-full bg-leaf" />
+          Saved · just now
+        </>
+      )}
+      {status === 'error' && (
+        <button onClick={onRetry} className="text-wax hover:underline cursor-pointer bg-transparent border-0 font-sans text-[12.5px]">
+          Error — retry
+        </button>
+      )}
+    </span>
   )
 }

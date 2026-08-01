@@ -1,26 +1,266 @@
 @import "tailwindcss";
 
+/* ── Design Tokens: Ink & Almanac ─────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f6f1e7;
+  --paper-2: #efe8da;
+  --card: #fffdf8;
+  --deckle: #e8dfcd;
+
+  --ink: #23201c;
+  --ink-2: #5a5346;
+  --ink-3: #8a7f6d;
+
+  --wax: #9c3b2c;
+  --wax-soft: #f0dcd6;
+
+  --leaf: #4f7b58;
+  --leaf-deep: #2f4a37;
+  --leaf-soft: #dfe8e0;
+
+  --brass: #c9a227;
+  --brass-soft: #f3e7c4;
+
+  --line: rgba(35, 32, 28, 0.11);
+  --line-2: rgba(35, 32, 28, 0.2);
+
+  --empty: #e4dccc;
+  --future: rgba(35, 32, 28, 0.045);
+
+  --shadow-1: 0 1px 2px rgba(58, 45, 26, 0.06);
+  --shadow-2: 0 2px 6px rgba(58, 45, 26, 0.07),
+    0 10px 26px -14px rgba(58, 45, 26, 0.24);
+  --shadow-3: 0 18px 44px -18px rgba(58, 45, 26, 0.4);
+
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.05'/></svg>");
+
+  --backfill-fill: repeating-linear-gradient(
+    135deg,
+    var(--leaf) 0 3px,
+    var(--leaf-deep) 3px 6px
+  );
 }
+
+[data-theme="dark"] {
+  --paper: #171614;
+  --paper-2: #1d1c19;
+  --card: #211f1c;
+  --deckle: #2a2723;
+
+  --ink: #ece7dc;
+  --ink-2: #b3ab9c;
+  --ink-3: #847c6d;
+
+  --wax: #d4694f;
+  --wax-soft: #3a221c;
+
+  --leaf: #6f9e78;
+  --leaf-deep: #3d5c45;
+  --leaf-soft: #203024;
+
+  --brass: #d9b452;
+  --brass-soft: #3b3116;
+
+  --line: rgba(236, 231, 220, 0.1);
+  --line-2: rgba(236, 231, 220, 0.2);
+
+  --empty: #2c2925;
+  --future: rgba(236, 231, 220, 0.035);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 2px 8px rgba(0, 0, 0, 0.44),
+    0 14px 30px -16px rgba(0, 0, 0, 0.7);
+  --shadow-3: 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.11'/></svg>");
+}
+
+/* ── Tailwind v4 theme extension ──────────────────────────────── */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-deckle: var(--deckle);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-wax: var(--wax);
+  --color-wax-soft: var(--wax-soft);
+
+  --color-leaf: var(--leaf);
+  --color-leaf-deep: var(--leaf-deep);
+  --color-leaf-soft: var(--leaf-soft);
+
+  --color-brass: var(--brass);
+  --color-brass-soft: var(--brass-soft);
+
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+
+  --color-empty: var(--empty);
+  --color-future: var(--future);
+
+  --font-serif: var(--font-literata), Georgia, serif;
+  --font-sans: var(--font-instrument-sans), Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-space-grotesk), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ── Base styles ──────────────────────────────────────────────── */
+
+body {
+  background: var(--paper);
+  background-image: var(--grain);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--brass-soft);
+  color: var(--ink);
+}
+
+textarea {
+  font: inherit;
+}
+
+textarea::placeholder {
+  color: var(--ink-3);
+  opacity: 0.75;
+}
+
+a:any-link:not([class*="bg-"]) {
+  color: var(--wax);
+}
+
+a:any-link:not([class*="bg-"]):hover {
+  color: var(--ink);
+}
+
+a:any-link {
+  text-decoration: none;
+}
+
+button:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* ── Hover effects (transform/opacity only — cheap) ───────────── */
+
+.hv-lift {
+  transition: transform 160ms cubic-bezier(0.2, 0.7, 0.3, 1), filter 160ms;
+}
+.hv-lift:hover {
+  transform: translateY(-2px);
+}
+
+.hv-cell {
+  transition: transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.hv-cell:hover {
+  transform: scale(1.4);
+}
+
+.hv-day {
+  transition: transform 160ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 160ms;
+}
+.hv-day:hover {
+  transform: translateY(-3px);
+}
+
+.hv-out {
+  transition: all 160ms;
+}
+.hv-out:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* ── Animations ───────────────────────────────────────────────── */
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes unroll {
+  from {
+    opacity: 0;
+    transform: translateX(16px) rotate(0.4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.an-rise {
+  animation: riseIn 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.an-unroll {
+  animation: unroll 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* ── Photo hover ─────────────────────────────────────────────── */
+
+.hv-photo {
+  transition: transform 320ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 320ms;
+}
+.hv-photo:hover {
+  transform: rotate(0deg) scale(1.05);
+  box-shadow: var(--shadow-3);
+}
+
+/* ── Loading animations (mounted only during loading state) ──── */
+
+@keyframes inkPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes nibSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.an-pulse {
+  animation: inkPulse 2.4s ease-in-out infinite;
+}
+
+.an-sweep {
+  animation: nibSweep 1.6s linear infinite;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

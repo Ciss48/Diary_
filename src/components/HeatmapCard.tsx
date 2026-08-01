@@ -12,25 +12,24 @@ const MONTHS = [
 
 type Props = {
   mode: 'year' | 'month'
-  // Year mode
   yearGrid: YearCell[][]
   yearLabelOffsets: { month: number; weekIndex: number }[]
   year: number
   currentYear: number
   yearEntryCount: number
-  // Month mode
   monthGrid: MonthCell[][]
   monthStr: string
   today: string
   monthDays: number
   monthEntryCount: number
   monthOptions: { value: string; label: string; disabled: boolean }[]
-  // Shared
-  currentMonth: string // 'YYYY-MM' — for toggle URL + canGoNext
+  currentMonth: string
 }
 
-const NAV_BTN = 'w-8 h-[34px] border border-stone-200 bg-white rounded-lg text-stone-500 text-[15px] flex items-center justify-center hover:border-stone-800 hover:text-stone-800 transition-colors'
-const NAV_DISABLED = 'w-8 h-[34px] border border-stone-200 bg-white rounded-lg text-stone-500 text-[15px] flex items-center justify-center opacity-40 cursor-default'
+const NAV_BTN =
+  'hv-out w-8 h-[34px] border border-line-2 bg-transparent rounded-lg text-ink-2 text-[15px] leading-none flex items-center justify-center cursor-pointer'
+const NAV_DISABLED =
+  'w-8 h-[34px] border border-line-2 bg-transparent rounded-lg text-ink-3 text-[15px] leading-none flex items-center justify-center opacity-40 cursor-default'
 
 export default function HeatmapCard({
   mode, yearGrid, yearLabelOffsets, year, currentYear, yearEntryCount,
@@ -38,50 +37,56 @@ export default function HeatmapCard({
   currentMonth,
 }: Props) {
   const isYear = mode === 'year'
-  const weekCount = yearGrid.length
 
-  // Month mode navigation
   const monthYear = Number(monthStr.slice(0, 4))
   const monthNum = Number(monthStr.slice(5, 7))
   const canGoPrevMonth = monthStr > '2020-01'
   const canGoNextMonth = monthStr < currentMonth
 
-  // Header
   const title = isYear
-    ? `${year} \u00B7 full year`
-    : `${MONTHS[monthNum - 1]} ${monthYear}`
+    ? `${year} in full`
+    : `${MONTHS[monthNum - 1]} ${year}`
   const subtitle = isYear
-    ? `${weekCount} weeks \u00B7 hover a day for details`
-    : `${monthDays} days \u00B7 ${monthEntryCount} entries logged`
+    ? 'each square is a day \u2014 hover for details'
+    : `${monthDays} days \u00B7 ${monthEntryCount} entries`
 
-  // Toggle URLs
   const toMonthUrl = `/?hview=month&hm=${
     year === Number(currentMonth.slice(0, 4)) ? currentMonth : `${year}-01`
   }`
   const toYearUrl = `/?hview=year&y=${monthYear}`
 
   return (
-    <section className="bg-white border border-stone-200 rounded-[14px] shadow-sm px-4 sm:px-6 py-5 flex flex-col gap-5">
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-[17px] font-semibold tracking-tight m-0">
+    <section
+      className="relative bg-card border border-line rounded-2xl shadow-[var(--shadow-2)] px-4 sm:px-[26px] py-5 sm:py-6 flex flex-col gap-5 overflow-hidden"
+    >
+      {/* Grain overlay */}
+      <span
+        className="absolute inset-0 pointer-events-none opacity-70"
+        style={{ backgroundImage: 'var(--grain)' }}
+      />
+
+      {/* Header */}
+      <div className="relative flex items-end justify-between gap-4 flex-wrap">
+        <div className="flex flex-col gap-[3px]">
+          <h2 className="m-0 font-serif text-[20px] font-medium tracking-tight">
             {title}
           </h2>
-          <span className="text-[13px] text-stone-400">{subtitle}</span>
+          <span className="font-serif italic text-[12.5px] text-ink-3">
+            {subtitle}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-[9px] flex-wrap">
           {/* Toggle */}
-          <div className="flex bg-stone-100 rounded-[9px] p-[3px] gap-0.5">
+          <div className="flex gap-[2px] bg-paper-2 rounded-[9px] p-[3px]">
             {isYear ? (
               <>
-                <span className="bg-white text-stone-800 shadow-sm text-[13px] font-medium px-4 py-[7px] rounded-[7px]">
+                <span className="bg-card text-ink shadow-[var(--shadow-1)] text-[12.5px] font-medium px-[15px] py-[7px] rounded-[7px]">
                   Year
                 </span>
                 <Link
                   href={toMonthUrl}
-                  className="bg-transparent text-stone-500 hover:text-stone-700 text-[13px] font-medium px-4 py-[7px] rounded-[7px] transition-colors"
+                  className="bg-transparent text-ink-3 hover:text-ink text-[12.5px] font-medium px-[15px] py-[7px] rounded-[7px] transition-colors"
                 >
                   Month
                 </Link>
@@ -90,11 +95,11 @@ export default function HeatmapCard({
               <>
                 <Link
                   href={toYearUrl}
-                  className="bg-transparent text-stone-500 hover:text-stone-700 text-[13px] font-medium px-4 py-[7px] rounded-[7px] transition-colors"
+                  className="bg-transparent text-ink-3 hover:text-ink text-[12.5px] font-medium px-[15px] py-[7px] rounded-[7px] transition-colors"
                 >
                   Year
                 </Link>
-                <span className="bg-white text-stone-800 shadow-sm text-[13px] font-medium px-4 py-[7px] rounded-[7px]">
+                <span className="bg-card text-ink shadow-[var(--shadow-1)] text-[12.5px] font-medium px-[15px] py-[7px] rounded-[7px]">
                   Month
                 </span>
               </>
@@ -103,11 +108,11 @@ export default function HeatmapCard({
 
           {/* Navigation */}
           {isYear ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-[6px]">
               <Link href={`/?hview=year&y=${year - 1}`} className={NAV_BTN}>
                 &#8249;
               </Link>
-              <span className="text-[13.5px] font-medium min-w-[46px] text-center">
+              <span className="font-mono text-[13.5px] font-medium min-w-[48px] text-center">
                 {year}
               </span>
               {year < currentYear ? (
@@ -119,7 +124,7 @@ export default function HeatmapCard({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-[6px]">
               {canGoPrevMonth ? (
                 <Link
                   href={`/?hview=month&hm=${previousMonth(monthStr)}`}
@@ -150,49 +155,68 @@ export default function HeatmapCard({
       </div>
 
       {/* Grid */}
-      {isYear ? (
-        <HeatmapYearGrid
-          weeks={yearGrid}
-          labelOffsets={yearLabelOffsets}
-          today={today}
-        />
-      ) : (
-        <HeatmapMonthGrid weeks={monthGrid} today={today} />
-      )}
+      <div className="relative">
+        {isYear ? (
+          <HeatmapYearGrid
+            weeks={yearGrid}
+            labelOffsets={yearLabelOffsets}
+            today={today}
+          />
+        ) : (
+          <HeatmapMonthGrid weeks={monthGrid} today={today} />
+        )}
+      </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 flex-wrap border-t border-stone-100 pt-4">
-        <LegendItem color="bg-stone-200">No entry</LegendItem>
-        <LegendItem color="bg-emerald-500">Written on time</LegendItem>
-        <LegendItem color="bg-emerald-300">Backfilled</LegendItem>
-        <LegendItem color="bg-stone-50" border>Future</LegendItem>
-        <div className="ml-auto">
-          <LegendItem color="bg-white" ring>Today</LegendItem>
-        </div>
+      <div className="relative flex items-center gap-4 flex-wrap border-t border-line pt-[15px] text-[12px] text-ink-2">
+        <LegendKey bg="var(--empty)">No entry</LegendKey>
+        <LegendKey bg="var(--leaf)">Written on time</LegendKey>
+        <LegendKey bg="var(--backfill-fill)">Backfilled</LegendKey>
+        <LegendKey bg="var(--future)" border="1px dashed var(--line-2)">Future</LegendKey>
+
+        <span className="flex items-center gap-[7px] ml-auto">
+          <span
+            className="w-[13px] h-[13px] rounded-[3.5px]"
+            style={{ boxShadow: '0 0 0 2px var(--brass)' }}
+          />
+          Today
+        </span>
+
+        <span className="flex items-center gap-[6px] pl-[10px] border-l border-line">
+          <MoodDot bg="var(--brass)" />happy
+          <MoodDot bg="var(--ink-3)" />normal
+          <MoodDot border="1.4px solid var(--ink-3)" />sad
+        </span>
       </div>
     </section>
   )
 }
 
-function LegendItem({
-  color,
+function LegendKey({
+  bg,
   border,
-  ring,
   children,
 }: {
-  color: string
-  border?: boolean
-  ring?: boolean
+  bg: string
+  border?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="flex items-center gap-1.5 text-[12.5px] text-stone-500">
+    <span className="flex items-center gap-[7px]">
       <span
-        className={`w-[13px] h-[13px] rounded-[3px] ${color} inline-block box-border ${
-          border ? 'border border-stone-200' : ''
-        } ${ring ? 'ring-[1.8px] ring-amber-500' : ''}`}
+        className="w-[13px] h-[13px] rounded-[3.5px] box-border"
+        style={{ background: bg, border: border ?? 'none' }}
       />
       {children}
-    </div>
+    </span>
+  )
+}
+
+function MoodDot({ bg, border }: { bg?: string; border?: string }) {
+  return (
+    <span
+      className="w-2 h-2 rounded-full box-border"
+      style={{ background: bg ?? 'transparent', border: border ?? '0' }}
+    />
   )
 }

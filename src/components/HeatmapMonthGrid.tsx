@@ -12,74 +12,81 @@ export default function HeatmapMonthGrid({ weeks, today }: Props) {
   const cells = weeks.flat()
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="an-rise flex flex-col gap-2">
       {/* DOW headers */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2 text-[10px] sm:text-[11.5px] font-medium text-stone-400 tracking-wide">
+      <div className="grid grid-cols-7 gap-[5px] sm:gap-[9px] text-[10.5px] font-medium tracking-[.1em] text-ink-3">
         {DAYS.map((d) => (
           <span key={d}>{d}</span>
         ))}
       </div>
 
       {/* Cells */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+      <div className="grid grid-cols-7 gap-[5px] sm:gap-[9px]">
         {cells.map((cell, i) => {
           if (!cell.inMonth) {
-            return <div key={i} className="aspect-[1.35]" />
+            return <div key={i} />
           }
 
           const isToday = cell.date === today
           const isFuture = cell.state === 'future'
+          const hasEntry = cell.state === 'ontime' || cell.state === 'backfill'
 
           const bg =
-            isFuture ? 'bg-stone-50' :
-            cell.state === 'ontime' ? 'bg-emerald-500' :
-            cell.state === 'backfill' ? 'bg-emerald-300' :
-            'bg-stone-200'
+            isFuture ? 'var(--future)' :
+            cell.state === 'ontime' ? 'var(--leaf)' :
+            cell.state === 'backfill' ? 'var(--backfill-fill)' :
+            'var(--empty)'
 
-          const border = isFuture ? 'border border-stone-200' : ''
-          const opacity = isFuture ? 'opacity-55' : ''
-          const ring = isToday ? 'ring-2 ring-amber-500' : ''
+          const dayColor = hasEntry ? '#f3f7f3' : 'var(--ink-2)'
+          const metaColor = hasEntry ? 'rgba(243,247,243,.8)' : 'var(--ink-3)'
+          const meta = hasEntry ? `${cell.wordCount}w` : isFuture ? '' : '\u2014'
 
-          const dayColor =
-            cell.state === 'ontime' ? 'text-white' :
-            isFuture ? 'text-stone-300' :
-            'text-stone-800'
+          // Mood dot
+          let moodBg = 'transparent'
+          let moodBorder = '0'
+          if (cell.mood === 'happy') {
+            moodBg = 'var(--brass)'
+          } else if (cell.mood === 'normal') {
+            moodBg = hasEntry ? '#f3f7f3' : 'transparent'
+          } else if (cell.mood === 'sad') {
+            moodBorder = hasEntry ? '1.4px solid rgba(243,247,243,.85)' : '0'
+          }
+          const showMoodDot = cell.mood === 'happy' || cell.mood === 'sad' || (cell.mood === 'normal' && hasEntry)
 
-          const metaColor =
-            cell.state === 'ontime' ? 'text-white/80' :
-            cell.state === 'backfill' ? 'text-emerald-900/70' :
-            'text-stone-400'
-
-          const meta =
-            (cell.state === 'ontime' || cell.state === 'backfill')
-              ? `${cell.wordCount}w`
-              : isFuture ? '' : '\u2014'
-
-          const moodDot =
-            cell.mood === 'happy' ? 'bg-amber-400' :
-            cell.mood === 'sad' ? 'bg-blue-400' :
-            null
-
-          const tip = `${cell.date}${
-            cell.state === 'ontime' ? ` · ${cell.wordCount} words` :
-            cell.state === 'backfill' ? ` · ${cell.wordCount} words (backfilled)` :
-            isFuture ? ' · upcoming' : ' · no entry'
-          }`
+          const tip = `${cell.date}` +
+            (cell.state === 'ontime' ? ` · ${cell.wordCount} words · on time` :
+             cell.state === 'backfill' ? ` · ${cell.wordCount} words · backfilled` :
+             isFuture ? ' · upcoming' : ' · no entry') +
+            (cell.mood ? ` · ${cell.mood}` : '')
 
           const inner = (
             <div
-              className={`aspect-[1.35] rounded-[9px] ${bg} ${border} ${opacity} ${ring} box-border p-1.5 sm:p-2.5 flex flex-col justify-between transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md`}
+              className="hv-day aspect-square sm:aspect-[1.25] rounded-[10px] box-border p-[6px] sm:p-[9px] flex flex-col justify-between relative"
+              style={{
+                background: bg,
+                border: isFuture ? '1px dashed var(--line-2)' : '1px solid transparent',
+                boxShadow: isToday ? '0 0 0 2px var(--brass)' : 'none',
+                cursor: isFuture ? 'default' : 'pointer',
+                opacity: isFuture ? 0.6 : 1,
+              }}
               title={tip}
             >
-              <div className="flex items-start justify-between">
-                <span className={`text-[11px] sm:text-[13px] font-semibold ${dayColor}`}>
-                  {cell.dayOfMonth}
-                </span>
-                {moodDot && (
-                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${moodDot} shrink-0`} />
-                )}
-              </div>
-              <span className={`text-[9px] sm:text-[11px] ${metaColor} truncate`}>
+              <span
+                className="font-mono text-[12px] sm:text-[14px] font-medium"
+                style={{ color: dayColor }}
+              >
+                {cell.dayOfMonth}
+              </span>
+              {showMoodDot && (
+                <span
+                  className="absolute top-[6px] right-[6px] sm:top-[9px] sm:right-[9px] w-[7px] h-[7px] rounded-full box-border"
+                  style={{ background: moodBg, border: moodBorder }}
+                />
+              )}
+              <span
+                className="font-mono text-[10.5px]"
+                style={{ color: metaColor }}
+              >
                 {meta}
               </span>
             </div>

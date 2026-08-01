@@ -16,34 +16,66 @@ export default function SuggestionPanel({
   onRequest,
 }: Props) {
   return (
-    <div className="mt-4">
-      <div className="flex items-center gap-3 flex-wrap">
+    <div className="mt-[14px]">
+      <div className="flex items-center gap-[14px] flex-wrap">
         <button
           onClick={onRequest}
           disabled={!canRequest}
-          className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm font-medium
-                     hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed
-                     transition-colors"
+          className="hv-lift border-0 cursor-pointer bg-ink text-paper font-sans text-[14px] font-medium
+            px-[22px] py-[13px] rounded-[10px] shadow-[var(--shadow-1)]
+            disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? 'Reviewing…' : 'Suggest better English'}
         </button>
-        <span className="text-xs text-gray-400">
+        <span className="text-[12.5px] text-ink-3">
           {remaining} suggestion{remaining !== 1 ? 's' : ''} left today
         </span>
       </div>
 
+      {/* Loading state */}
       {loading && (
-        <p className="mt-3 text-sm text-gray-400">Reviewing your entry…</p>
+        <div className="mt-4 flex flex-col gap-4 pl-1">
+          <div className="flex items-center gap-2.5">
+            <span className="an-pulse w-2 h-2 rounded-full bg-leaf" />
+            <span className="font-serif italic text-[15px] text-ink-2">Reading your entry…</span>
+          </div>
+          <div className="flex flex-col gap-2.5 max-w-md">
+            {['96%', '88%', '74%', '92%', '60%', '84%', '90%', '70%', '46%'].map((w, i) => (
+              <div
+                key={i}
+                className="relative h-[13px] rounded-[3px] bg-paper-2 overflow-hidden"
+                style={{ width: w }}
+              >
+                <div
+                  className="an-sweep absolute inset-0 w-[34%]"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent, var(--leaf-soft), transparent)',
+                    animationDelay: `${(i * 0.12).toFixed(2)}s`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
+      {/* Error state */}
       {!loading && error && (
-        <div className="mt-3 flex items-center gap-3">
-          <p className="text-sm text-red-500">{error}</p>
+        <div className="mt-4 flex flex-col items-start gap-[14px]">
+          <div className="flex flex-col gap-2">
+            <span className="font-serif text-[19px] text-wax">The note came back blank.</span>
+            <span className="text-[13.5px] text-ink-3 max-w-[34ch] leading-[1.6]" style={{ textWrap: 'pretty' as string }}>
+              {error === 'Could not reach the server.'
+                ? error
+                : 'Something went wrong on our side. Your entry is safe and unchanged.'}
+            </span>
+          </div>
           <button
             onClick={onRequest}
             disabled={!canRequest}
-            className="text-sm text-gray-600 underline hover:text-gray-900
-                       disabled:opacity-40 disabled:cursor-not-allowed"
+            className="border border-wax bg-transparent text-wax cursor-pointer font-sans text-[13.5px]
+              font-medium px-[18px] py-[10px] rounded-[9px]
+              disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Try again
           </button>

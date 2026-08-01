@@ -8,38 +8,44 @@ interface Props {
   disabled?: boolean
 }
 
-const MOODS: { key: Mood; label: string; active: string }[] = [
-  { key: 'happy',  label: 'Happy',  active: 'bg-amber-400 border-amber-400' },
-  { key: 'normal', label: 'Normal', active: 'bg-stone-300 border-stone-300' },
-  { key: 'sad',    label: 'Sad',    active: 'bg-blue-400 border-blue-400' },
+const MOODS: { key: Mood; glyph: string }[] = [
+  { key: 'happy',  glyph: '☀' },
+  { key: 'normal', glyph: '◐' },
+  { key: 'sad',    glyph: '☂' },
 ]
 
 export default function MoodPicker({ value, onChange, disabled }: Props) {
   function handleClick(key: Mood) {
-    // Clicking the selected mood deselects it
     onChange(value === key ? null : key)
   }
 
   return (
-    <div className="flex items-center gap-1.5" aria-label="Mood">
-      {MOODS.map(({ key, label, active }) => (
-        <button
-          key={key}
-          type="button"
-          title={label}
-          aria-label={label}
-          aria-pressed={value === key}
-          disabled={disabled}
-          onClick={() => handleClick(key)}
-          className={[
-            'h-5 w-5 rounded-full border transition-colors',
-            value === key
-              ? active
-              : 'border-stone-300 bg-transparent hover:border-stone-400',
-            disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
-          ].join(' ')}
-        />
-      ))}
+    <div className="flex items-center gap-1.5 pl-1.5" aria-label="Mood">
+      {MOODS.map(({ key, glyph }) => {
+        const on = value === key
+        return (
+          <button
+            key={key}
+            type="button"
+            title={key}
+            aria-label={key}
+            aria-pressed={on}
+            disabled={disabled}
+            onClick={() => handleClick(key)}
+            className={[
+              'w-[34px] h-[34px] rounded-full flex items-center justify-center',
+              'text-[15px] leading-none cursor-pointer',
+              'transition-all duration-[180ms] ease-[cubic-bezier(.2,.7,.3,1)]',
+              on
+                ? 'bg-brass-soft border-[1.5px] border-brass scale-[1.06]'
+                : 'bg-transparent border-[1.5px] border-line-2 text-ink-3',
+              disabled ? 'opacity-40 cursor-not-allowed' : '',
+            ].join(' ')}
+          >
+            {glyph}
+          </button>
+        )
+      })}
     </div>
   )
 }

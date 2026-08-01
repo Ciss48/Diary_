@@ -2,18 +2,11 @@
 
 import type { DiffChange } from '@/lib/diff'
 
-const TYPE_LABELS: Record<string, string> = {
-  grammar: 'Grammar',
-  vocabulary: 'Vocabulary',
-  style: 'Style',
-  spelling: 'Spelling',
-}
-
-const TYPE_COLORS: Record<string, string> = {
-  grammar: 'bg-blue-100 text-blue-700',
-  vocabulary: 'bg-purple-100 text-purple-700',
-  style: 'bg-green-100 text-green-700',
-  spelling: 'bg-red-100 text-red-700',
+const TYPE_CHIPS: Record<string, { bg: string; fg: string }> = {
+  grammar:    { bg: 'var(--wax-soft)',   fg: 'var(--wax)' },
+  vocabulary: { bg: 'var(--brass-soft)', fg: 'var(--brass)' },
+  style:      { bg: 'var(--leaf-soft)',  fg: 'var(--leaf)' },
+  spelling:   { bg: 'var(--paper-2)',    fg: 'var(--ink-2)' },
 }
 
 interface Props {
@@ -32,63 +25,100 @@ export default function SuggestionDetails({
   onSelectChange,
 }: Props) {
   return (
-    <div className="space-y-4 mt-5">
+    <div className="flex flex-col gap-[11px] mt-5">
       {contentDrifted && (
-        <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-md">
+        <p className="text-[12px] text-brass bg-brass-soft border border-brass px-3 py-2 rounded-lg">
           Your entry has changed since this suggestion.
         </p>
       )}
 
       {changes.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-            Changes
-          </p>
-          <ol className="space-y-2">
-            {changes.map((change, idx) => (
-              <li
-                key={idx}
-                onClick={() => onSelectChange(idx)}
-                className={`rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                  selectedChange === idx
-                    ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-start gap-2 flex-wrap">
-                  {change.original && (
-                    <span className="text-sm text-gray-500 line-through shrink-0">
-                      {change.original}
-                    </span>
-                  )}
-                  <span className="text-sm text-gray-400 shrink-0">→</span>
-                  <span className="text-sm font-medium text-gray-800 shrink-0">
-                    {change.corrected}
-                  </span>
+          <div className="flex items-baseline gap-2.5 mb-[11px]">
+            <span className="text-[10.5px] font-medium tracking-[.15em] text-ink-3 uppercase">
+              MARGIN NOTES
+            </span>
+            <span className="font-serif italic text-[13px] text-ink-3">
+              tap a highlight above to jump here
+            </span>
+          </div>
+          <div className="grid md:grid-cols-2 gap-2.5">
+            {changes.map((change, idx) => {
+              const on = selectedChange === idx
+              const chip = change.type ? TYPE_CHIPS[change.type] : null
+              return (
+                <div
+                  key={idx}
+                  onClick={() => onSelectChange(idx)}
+                  className={[
+                    'relative rounded-[11px] px-[15px] py-[13px] pl-[17px] cursor-pointer overflow-hidden',
+                    'transition-all duration-[180ms] ease-[cubic-bezier(.2,.7,.3,1)]',
+                    on
+                      ? 'bg-brass-soft border border-brass shadow-[var(--shadow-2)]'
+                      : 'bg-card border border-line shadow-[var(--shadow-1)]',
+                  ].join(' ')}
+                >
+                  {/* Left accent spine */}
                   <span
-                    className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                      change.type ? (TYPE_COLORS[change.type] ?? 'bg-gray-100 text-gray-600') : 'bg-gray-100 text-gray-600'
+                    className={`absolute left-0 top-0 bottom-0 w-[3px] transition-colors duration-[180ms] ${
+                      on ? 'bg-brass' : 'bg-transparent'
                     }`}
-                  >
-                    {change.type ? (TYPE_LABELS[change.type] ?? change.type) : 'Change'}
-                  </span>
+                  />
+                  <div className="flex items-baseline gap-[9px] flex-wrap">
+                    {change.original && (
+                      <span
+                        className="font-serif text-[15px] text-ink-3"
+                        style={{ textDecoration: 'line-through', textDecorationColor: 'var(--wax)' }}
+                      >
+                        {change.original}
+                      </span>
+                    )}
+                    <span className="text-ink-3 text-[13px]">→</span>
+                    <span className="font-serif text-[15px] font-medium text-ink">
+                      {change.corrected}
+                    </span>
+                    {chip && (
+                      <span
+                        className="ml-auto text-[10.5px] font-medium tracking-[.06em] uppercase px-2 py-[2.5px] rounded-full shrink-0"
+                        style={{ color: chip.fg, background: chip.bg }}
+                      >
+                        {change.type}
+                      </span>
+                    )}
+                  </div>
+                  {change.explanation && (
+                    <p className="mt-[7px] text-[13px] leading-[1.55] text-ink-2" style={{ textWrap: 'pretty' as string }}>
+                      {change.explanation}
+                    </p>
+                  )}
                 </div>
-                {change.explanation && (
-                  <p className="mt-1 text-xs text-gray-500">{change.explanation}</p>
-                )}
-              </li>
-            ))}
-          </ol>
+              )
+            })}
+          </div>
         </div>
       )}
 
       {feedback && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-            Feedback
+        <section
+          className="relative rounded-[14px] bg-card border border-line shadow-[var(--shadow-2)]
+            px-[26px] py-[22px] pl-[30px] overflow-hidden mt-2"
+          style={{ backgroundImage: 'var(--grain)' }}
+        >
+          {/* Brass spine */}
+          <span className="absolute left-0 top-0 bottom-0 w-1 bg-brass" />
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <span className="text-[10.5px] font-medium tracking-[.15em] text-ink-3 uppercase">
+              A NOTE FROM YOUR TUTOR
+            </span>
+            <span className="flex-1 h-px bg-line" />
+          </div>
+          <p className="m-0 font-serif text-[16px] leading-[1.72] text-ink max-w-[78ch]" style={{ textWrap: 'pretty' as string }}>
+            {feedback}
           </p>
-          <p className="text-sm text-gray-700 leading-relaxed">{feedback}</p>
-        </div>
+          <p className="mt-[14px] m-0 font-serif italic text-[14px] text-ink-3">
+            — see you tomorrow, same page
+          </p>
+        </section>
       )}
     </div>
   )
