@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isValidDateString, getTodayInTimezone } from '@/lib/dates';
 import { callAI } from '@/lib/ai/provider';
-import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
+import { STAGE1_PROMPT, STAGE2_PROMPT } from '@/lib/ai/prompt';
 import { parseSuggestion } from '@/lib/suggestions';
 
 interface ProviderError extends Error {
@@ -21,14 +21,19 @@ export async function POST(req: NextRequest) {
 
   // 2. Validate body
   let date: string;
+  let stage: number;
   try {
     const body = await req.json();
     date = body?.date;
+    stage = body?.stage ?? 1;
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
   if (!isValidDateString(date)) {
     return NextResponse.json({ error: 'Invalid date.' }, { status: 400 });
+  }
+  if (stage !== 1 && stage !== 2) {
+    return NextResponse.json({ error: 'Invalid stage.' }, { status: 400 });
   }
 
   // 3. Timezone → usage_date (the user's local today, not the entry's date)
@@ -60,7 +65,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 6. Rate limit: count by usage_date, not entry_date
+  // 6. Rate limit: count by usage_date, not entry_date (all stages count together)
   const limit = Number(process.env.AI_DAILY_LIMIT ?? 5);
   const { count } = await supabase
     .from('ai_suggestions')
@@ -75,10 +80,41 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 7. Call AI provider
+  // 7. Determine prompt and input based on stage
+  let systemPrompt: string;
+  let userContent: string;
+  let parentId: string | null = null;
+
+  if (stage === 2) {
+    // Stage 2: load most recent stage-1 suggestion for this entry
+    const { data: stage1 } = await supabase
+      .from('ai_suggestions')
+      .select('id, corrected_version')
+      .eq('entry_id', entry.id)
+      .eq('stage', 1)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!stage1) {
+      return NextResponse.json(
+        { error: "Run 'Fix my English' first." },
+        { status: 400 },
+      );
+    }
+
+    systemPrompt = STAGE2_PROMPT;
+    userContent = stage1.corrected_version;
+    parentId = stage1.id;
+  } else {
+    systemPrompt = STAGE1_PROMPT;
+    userContent = content;
+  }
+
+  // 8. Call AI provider
   let raw: string;
   try {
-    raw = await callAI(SYSTEM_PROMPT, content);
+    raw = await callAI(systemPrompt, userContent);
   } catch (err) {
     const providerErr = err as ProviderError;
     console.error('[/api/suggest] AI call failed:', providerErr.message);
@@ -94,7 +130,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 8. Parse — failed parse does NOT count against quota (no INSERT)
+  // 9. Parse — failed parse does NOT count against quota (no INSERT)
   const payload = parseSuggestion(raw);
   if (!payload) {
     console.error('[/api/suggest] parseSuggestion returned null. Raw:', raw?.slice(0, 200));
@@ -104,7 +140,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 9. Persist — only after successful parse
+  // 10. Persist — only after successful parse
   const model = process.env.AI_MODEL ?? 'unknown';
   const { data: inserted, error: insertError } = await supabase
     .from('ai_suggestions')
@@ -112,13 +148,15 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       entry_id: entry.id,
       usage_date: today,
-      source_content: content,
+      source_content: userContent,
       corrected_version: payload.corrected_version,
       changes: payload.changes,
       overall_feedback: payload.overall_feedback,
       model,
+      stage,
+      parent_id: parentId,
     })
-    .select('id, source_content, corrected_version, changes, overall_feedback, created_at')
+    .select('id, source_content, corrected_version, changes, overall_feedback, created_at, stage, parent_id')
     .single();
 
   if (insertError || !inserted) {
@@ -126,7 +164,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not save suggestion.' }, { status: 500 });
   }
 
-  // 10. Success
+  // 11. Success
   const remaining = Math.max(0, limit - used - 1);
   return NextResponse.json({ suggestion: inserted, remaining });
 }

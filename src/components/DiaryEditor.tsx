@@ -1,21 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { fetchEntry, saveEntry, updateMood, ensureEntry, type Entry } from '@/lib/entries'
 import { countWords, getTodayInTimezone } from '@/lib/dates'
 import type { Mood } from '@/lib/streaks'
 import MoodPicker from '@/components/MoodPicker'
 import { filterChanges, type StoredSuggestion } from '@/lib/suggestions'
-import { diffTexts, diffToSegments, buildDiffChanges } from '@/lib/diff'
+import { diffTexts, diffToSegments, diffToOriginalSegments, buildDiffChanges } from '@/lib/diff'
 import ImprovedVersionPane from '@/components/ImprovedVersionPane'
 import SuggestionDetails from '@/components/SuggestionDetails'
 import SuggestionPanel from '@/components/SuggestionPanel'
+import OriginalVersionPane from '@/components/OriginalVersionPane'
 import PhotoStrip from '@/components/PhotoStrip'
 
 interface Props {
   date: string       // 'YYYY-MM-DD'
   timezone: string
-  initialSuggestion: StoredSuggestion | null
+  initialStage1: StoredSuggestion | null
+  initialStage2: StoredSuggestion | null
   initialRemaining: number
 }
 
@@ -43,7 +45,7 @@ const PROMPTS = [
   ['Something I want to fix', 'One thing I want to fix is '],
 ]
 
-export default function DiaryEditor({ date, timezone, initialSuggestion, initialRemaining }: Props) {
+export default function DiaryEditor({ date, timezone, initialStage1, initialStage2, initialRemaining }: Props) {
   // ── Entry state ──────────────────────────────────────────────────────────
   const [content, setContent] = useState('')
   const [wordCount, setWordCount] = useState(0)
@@ -60,23 +62,43 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
 
   const isBackfillDate = date < getTodayInTimezone(timezone)
 
-  // ── Suggestion state ─────────────────────────────────────────────────────
-  const [suggestion, setSuggestion] = useState<StoredSuggestion | null>(initialSuggestion)
+  // ── Suggestion state (two stages) ───────────────────────────────────────
+  const [stage1, setStage1] = useState<StoredSuggestion | null>(initialStage1)
+  const [stage2, setStage2] = useState<StoredSuggestion | null>(initialStage2)
+  const [activeStage, setActiveStage] = useState<1 | 2>(initialStage2 ? 2 : 1)
   const [remaining, setRemaining] = useState(initialRemaining)
-  const [sugLoading, setSugLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState<1 | 2 | null>(null)
   const [sugError, setSugError] = useState<string | null>(null)
   const [selectedChange, setSelectedChange] = useState<number | null>(null)
   const [dismissed, setDismissed] = useState(false)
+  const [editMode, setEditMode] = useState(false)
 
   // ── Derived ──────────────────────────────────────────────────────────────
-  const safeChanges = suggestion ? filterChanges(suggestion.changes as unknown[]) : []
-  const diffSpans = suggestion ? diffTexts(suggestion.source_content, suggestion.corrected_version) : []
-  const segments = suggestion ? diffToSegments(diffSpans) : []
-  const diffChanges = suggestion ? buildDiffChanges(diffSpans, safeChanges) : []
-  const hasSuggestionVisible = suggestion !== null && !dismissed
-  const contentDrifted =
-    suggestion != null && content.trim() !== suggestion.source_content.trim()
-  const canRequest = content.trim() !== '' && remaining > 0 && !sugLoading
+  const activeSuggestion = activeStage === 2 && stage2 ? stage2 : stage1
+  const hasSuggestionVisible = activeSuggestion !== null && !dismissed
+
+  // Diff source/target depend on active stage
+  const diffSpans = useMemo(() => {
+    if (!activeSuggestion) return []
+    if (activeStage === 2 && stage2 && stage1) {
+      return diffTexts(stage1.corrected_version, stage2.corrected_version)
+    }
+    return diffTexts(activeSuggestion.source_content, activeSuggestion.corrected_version)
+  }, [activeSuggestion, activeStage, stage1, stage2])
+
+  const safeChanges = activeSuggestion ? filterChanges(activeSuggestion.changes as unknown[]) : []
+  const segments = useMemo(() => diffToSegments(diffSpans), [diffSpans])
+  const originalSegments = useMemo(() => diffToOriginalSegments(diffSpans), [diffSpans])
+  const diffChanges = useMemo(() => buildDiffChanges(diffSpans, safeChanges), [diffSpans, safeChanges])
+
+  const stage1Drifted = stage1 != null && content.trim() !== stage1.source_content.trim()
+  const contentDrifted = activeSuggestion != null && (
+    activeStage === 1
+      ? content.trim() !== activeSuggestion.source_content.trim()
+      : stage1Drifted // stage 2 is stale if stage 1 is stale
+  )
+  const canRequestStage1 = content.trim() !== '' && remaining > 0 && loadingStage === null
+  const canRequestStage2 = stage1 !== null && !stage1Drifted && remaining > 0 && loadingStage === null
 
   // ── Load entry ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -154,31 +176,43 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
   )
 
   // ── Suggestion fetch ─────────────────────────────────────────────────────
-  const handleSuggestRequest = useCallback(async () => {
-    setSugLoading(true)
+  const handleRequestStage = useCallback(async (stage: 1 | 2) => {
+    setLoadingStage(stage)
     setSugError(null)
     setSelectedChange(null)
     try {
       const res = await fetch('/api/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date }),
+        body: JSON.stringify({ date, stage }),
       })
       const json = await res.json()
       if (!res.ok) {
         setSugError(json?.error ?? 'Something went wrong.')
         return
       }
-      setSuggestion(json.suggestion as StoredSuggestion)
+      const sug = json.suggestion as StoredSuggestion
+      if (stage === 1) {
+        setStage1(sug)
+        setStage2(null) // invalidate stage 2 when stage 1 reruns
+        setActiveStage(1)
+      } else {
+        setStage2(sug)
+        setActiveStage(2)
+      }
       setRemaining(json.remaining as number)
       setDismissed(false)
       setSelectedChange(null)
+      setEditMode(false)
     } catch {
       setSugError('Could not reach the server.')
     } finally {
-      setSugLoading(false)
+      setLoadingStage(null)
     }
   }, [date])
+
+  const handleRequestStage1 = useCallback(() => handleRequestStage(1), [handleRequestStage])
+  const handleRequestStage2 = useCallback(() => handleRequestStage(2), [handleRequestStage])
 
   const handleSelectChange = useCallback((idx: number) => {
     setSelectedChange((prev) => (prev === idx ? null : idx))
@@ -200,6 +234,7 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
 
   // ── Render ───────────────────────────────────────────────────────────────
   const blank = content.trim().length === 0
+  const showStageTabs = stage1 !== null && stage2 !== null && !dismissed
 
   return (
     <main className="min-h-screen">
@@ -236,40 +271,79 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
           timezone={timezone}
           onPhotoCountChange={setPhotoCount}
         >
+          {/* ── Stage tabs ─────────────────────────────────────────── */}
+          {showStageTabs && (
+            <div className="flex gap-1 mb-3">
+              <button
+                onClick={() => { setActiveStage(1); setSelectedChange(null) }}
+                className={`text-[12px] font-medium tracking-[.05em] px-3.5 py-[7px] rounded-lg border cursor-pointer transition-colors duration-[160ms] ${
+                  activeStage === 1
+                    ? 'bg-wax-soft border-wax text-wax'
+                    : 'bg-transparent border-line text-ink-3 hover:text-ink'
+                }`}
+              >
+                Corrections
+              </button>
+              <button
+                onClick={() => { setActiveStage(2); setSelectedChange(null) }}
+                className={`text-[12px] font-medium tracking-[.05em] px-3.5 py-[7px] rounded-lg border cursor-pointer transition-colors duration-[160ms] ${
+                  activeStage === 2
+                    ? 'bg-leaf-soft border-leaf text-leaf'
+                    : 'bg-transparent border-line text-ink-3 hover:text-ink'
+                }`}
+              >
+                Style improvements
+              </button>
+            </div>
+          )}
+
           {/* ── Editor area ───────────────────────────────────────── */}
           {hasSuggestionVisible ? (
             <div className="an-rise grid md:grid-cols-2 gap-[18px] md:h-[60vh] md:min-h-[400px] overflow-hidden">
-              {/* Left column */}
-              <div className="flex flex-col h-[45vh] md:h-full min-h-0">
-                <div className="flex items-baseline justify-between mb-2 shrink-0">
-                  <span className="text-[10.5px] font-medium tracking-[.15em] text-ink-3 uppercase">
-                    YOUR ENTRY
-                  </span>
-                  <span className="font-mono text-[12px] text-ink-3">
-                    {wordCount} words
-                  </span>
+              {/* Left column — read-only with red marks, or textarea in edit mode */}
+              {editMode || activeStage === 2 ? (
+                <div className="flex flex-col h-[45vh] md:h-full min-h-0">
+                  <div className="flex items-baseline justify-between mb-2 shrink-0">
+                    <span className="text-[10.5px] font-medium tracking-[.15em] text-ink-3 uppercase">
+                      {activeStage === 2 ? 'CORRECTED VERSION' : 'YOUR ENTRY'}
+                    </span>
+                    <span className="font-mono text-[12px] text-ink-3">
+                      {wordCount} words
+                    </span>
+                  </div>
+                  <PaperSurface spine="wax" className="flex-1 min-h-0 flex flex-col">
+                    <textarea
+                      value={activeStage === 2 && stage1 ? stage1.corrected_version : content}
+                      onChange={activeStage === 1 ? handleChange : undefined}
+                      onBlur={activeStage === 1 ? handleBlur : undefined}
+                      readOnly={activeStage === 2}
+                      placeholder="Write your diary entry here…"
+                      spellCheck={activeStage === 1}
+                      className={`flex-1 min-h-0 w-full resize-none bg-transparent border-0 outline-none
+                        pl-[44px] sm:pl-[44px] pr-[26px] py-[26px]
+                        font-serif text-[16.5px] sm:text-[17.5px] leading-[1.78] text-ink
+                        caret-wax overflow-y-auto ${SCROLLBAR}
+                        ${activeStage === 2 ? 'cursor-default' : ''}`}
+                    />
+                  </PaperSurface>
                 </div>
-                <PaperSurface spine="wax" className="flex-1 min-h-0 flex flex-col">
-                  <textarea
-                    value={content}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    placeholder="Write your diary entry here…"
-                    spellCheck
-                    className={`flex-1 min-h-0 w-full resize-none bg-transparent border-0 outline-none
-                      pl-[44px] sm:pl-[44px] pr-[26px] py-[26px]
-                      font-serif text-[16.5px] sm:text-[17.5px] leading-[1.78] text-ink
-                      caret-wax overflow-y-auto ${SCROLLBAR}`}
-                  />
-                </PaperSurface>
-              </div>
+              ) : (
+                <OriginalVersionPane
+                  segments={originalSegments}
+                  selectedChange={selectedChange}
+                  onSelectChange={handleSelectChange}
+                  onEdit={() => setEditMode(true)}
+                  wordCount={wordCount}
+                  stageLabel="YOUR ENTRY"
+                />
+              )}
 
               {/* Right column */}
               <ImprovedVersionPane
-                key={suggestion.id}
+                key={activeSuggestion!.id}
                 segments={segments}
                 changesCount={diffChanges.length}
-                correctedVersion={suggestion.corrected_version}
+                correctedVersion={activeSuggestion!.corrected_version}
                 selectedChange={selectedChange}
                 onSelectChange={handleSelectChange}
                 onDismiss={() => setDismissed(true)}
@@ -293,20 +367,24 @@ export default function DiaryEditor({ date, timezone, initialSuggestion, initial
             </div>
           )}
 
-          {/* Suggest button + counter */}
+          {/* Suggest buttons + counter */}
           <SuggestionPanel
-            loading={sugLoading}
+            loadingStage={loadingStage}
             error={sugError}
             remaining={remaining}
-            canRequest={canRequest}
-            onRequest={handleSuggestRequest}
+            canRequestStage1={canRequestStage1}
+            canRequestStage2={canRequestStage2}
+            hasStage1={stage1 !== null}
+            stage1Drifted={stage1Drifted}
+            onRequestStage1={handleRequestStage1}
+            onRequestStage2={handleRequestStage2}
           />
 
           {/* Changes list + feedback */}
           {hasSuggestionVisible && (
             <SuggestionDetails
               changes={diffChanges}
-              feedback={suggestion!.overall_feedback}
+              feedback={activeSuggestion!.overall_feedback}
               contentDrifted={contentDrifted}
               selectedChange={selectedChange}
               onSelectChange={handleSelectChange}

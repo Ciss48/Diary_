@@ -20,6 +20,8 @@ export type StoredSuggestion = {
   changes: Change[];
   overall_feedback: string;
   created_at: string;
+  stage: 1 | 2;
+  parent_id: string | null;
 };
 
 export type Segment = {

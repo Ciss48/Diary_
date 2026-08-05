@@ -1,32 +1,57 @@
 'use client'
 
 interface Props {
-  loading: boolean
+  loadingStage: 1 | 2 | null
   error: string | null
   remaining: number
-  canRequest: boolean
-  onRequest: () => void
+  canRequestStage1: boolean
+  canRequestStage2: boolean
+  hasStage1: boolean
+  stage1Drifted: boolean
+  onRequestStage1: () => void
+  onRequestStage2: () => void
 }
 
 export default function SuggestionPanel({
-  loading,
+  loadingStage,
   error,
   remaining,
-  canRequest,
-  onRequest,
+  canRequestStage1,
+  canRequestStage2,
+  hasStage1,
+  stage1Drifted,
+  onRequestStage1,
+  onRequestStage2,
 }: Props) {
+  const loading = loadingStage !== null
+
   return (
     <div className="mt-[14px]">
       <div className="flex items-center gap-[14px] flex-wrap">
+        {/* Stage 1 — always visible */}
         <button
-          onClick={onRequest}
-          disabled={!canRequest}
+          onClick={onRequestStage1}
+          disabled={!canRequestStage1}
           className="hv-lift border-0 cursor-pointer bg-ink text-paper font-sans text-[14px] font-medium
             px-[22px] py-[13px] rounded-[10px] shadow-[var(--shadow-1)]
             disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? 'Reviewing…' : 'Suggest better English'}
+          {loadingStage === 1 ? 'Reviewing…' : 'Fix my English'}
         </button>
+
+        {/* Stage 2 — only after stage 1 exists and entry hasn't drifted */}
+        {hasStage1 && !stage1Drifted && (
+          <button
+            onClick={onRequestStage2}
+            disabled={!canRequestStage2}
+            className="hv-lift border border-ink bg-transparent text-ink cursor-pointer font-sans text-[14px] font-medium
+              px-[22px] py-[13px] rounded-[10px]
+              disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loadingStage === 2 ? 'Improving…' : 'Suggest better English'}
+          </button>
+        )}
+
         <span className="text-[12.5px] text-ink-3">
           {remaining} suggestion{remaining !== 1 ? 's' : ''} left today
         </span>
@@ -37,7 +62,9 @@ export default function SuggestionPanel({
         <div className="mt-4 flex flex-col gap-4 pl-1">
           <div className="flex items-center gap-2.5">
             <span className="an-pulse w-2 h-2 rounded-full bg-leaf" />
-            <span className="font-serif italic text-[15px] text-ink-2">Reading your entry…</span>
+            <span className="font-serif italic text-[15px] text-ink-2">
+              {loadingStage === 1 ? 'Reading your entry…' : 'Polishing the style…'}
+            </span>
           </div>
           <div className="flex flex-col gap-2.5 max-w-md">
             {['96%', '88%', '74%', '92%', '60%', '84%', '90%', '70%', '46%'].map((w, i) => (
@@ -71,8 +98,8 @@ export default function SuggestionPanel({
             </span>
           </div>
           <button
-            onClick={onRequest}
-            disabled={!canRequest}
+            onClick={onRequestStage1}
+            disabled={!canRequestStage1}
             className="border border-wax bg-transparent text-wax cursor-pointer font-sans text-[13.5px]
               font-medium px-[18px] py-[10px] rounded-[9px]
               disabled:opacity-40 disabled:cursor-not-allowed"

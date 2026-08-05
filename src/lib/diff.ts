@@ -362,6 +362,40 @@ export function diffToSegments(spans: DiffSpan[]): Segment[] {
   return segments
 }
 
+/**
+ * Convert diff spans into Segment[] for OriginalVersionPane rendering.
+ * Non-equal spans become highlighted segments (changeIndex = sequential index).
+ * Equal spans become plain segments (changeIndex = null).
+ *
+ * changeIndex numbering is identical to diffToSegments so that clicking
+ * a red mark on the left and a green mark on the right select the same
+ * change in the list.
+ *
+ * INVARIANT: segments.map(s => s.text).join('') === original
+ * No empty segments.
+ */
+export function diffToOriginalSegments(spans: DiffSpan[]): Segment[] {
+  const segments: Segment[] = []
+  let changeIdx = 0
+
+  for (const span of spans) {
+    if (span.kind === 'equal') {
+      if (span.original.length > 0) {
+        segments.push({ text: span.original, changeIndex: null })
+      }
+    } else {
+      // For inserted spans, there's no original text to show
+      if (span.original.length > 0) {
+        segments.push({ text: span.original, changeIndex: changeIdx })
+      }
+      // Always increment to stay in sync with diffToSegments
+      changeIdx++
+    }
+  }
+
+  return segments
+}
+
 // ── Build changes list ────────────────────────────────────────────────────────
 
 /**

@@ -49,21 +49,45 @@ export default async function DiaryPage({ params }: Props) {
     .eq('entry_date', date)
     .single()
 
-  // Load most recent suggestion for this entry (null if no entry yet)
-  let initialSuggestion: StoredSuggestion | null = null
+  // Load both stages for this entry
+  let initialStage1: StoredSuggestion | null = null
+  let initialStage2: StoredSuggestion | null = null
+
   if (entry?.id) {
-    const { data: raw } = await supabase
+    // Most recent stage 1 for this entry
+    const { data: raw1 } = await supabase
       .from('ai_suggestions')
-      .select('id, source_content, corrected_version, changes, overall_feedback, created_at')
+      .select('id, source_content, corrected_version, changes, overall_feedback, created_at, stage, parent_id')
       .eq('entry_id', entry.id)
+      .eq('stage', 1)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
-    if (raw) {
-      initialSuggestion = {
-        ...raw,
-        changes: filterChanges(Array.isArray(raw.changes) ? raw.changes : []),
+    if (raw1) {
+      initialStage1 = {
+        ...raw1,
+        stage: raw1.stage as 1,
+        parent_id: raw1.parent_id as string | null,
+        changes: filterChanges(Array.isArray(raw1.changes) ? raw1.changes : []),
+      }
+
+      // Most recent stage 2 derived from this stage 1
+      const { data: raw2 } = await supabase
+        .from('ai_suggestions')
+        .select('id, source_content, corrected_version, changes, overall_feedback, created_at, stage, parent_id')
+        .eq('parent_id', raw1.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (raw2) {
+        initialStage2 = {
+          ...raw2,
+          stage: raw2.stage as 2,
+          parent_id: raw2.parent_id as string | null,
+          changes: filterChanges(Array.isArray(raw2.changes) ? raw2.changes : []),
+        }
       }
     }
   }
@@ -82,7 +106,8 @@ export default async function DiaryPage({ params }: Props) {
     <DiaryEditor
       date={date}
       timezone={tz}
-      initialSuggestion={initialSuggestion}
+      initialStage1={initialStage1}
+      initialStage2={initialStage2}
       initialRemaining={initialRemaining}
     />
   )
