@@ -12,6 +12,8 @@ import SuggestionDetails from '@/components/SuggestionDetails'
 import SuggestionPanel from '@/components/SuggestionPanel'
 import OriginalVersionPane from '@/components/OriginalVersionPane'
 import PhotoStrip from '@/components/PhotoStrip'
+import VocabPanel from '@/components/VocabPanel'
+import type { SavedVocabItem } from '@/lib/vocab'
 
 interface Props {
   date: string       // 'YYYY-MM-DD'
@@ -19,6 +21,7 @@ interface Props {
   initialStage1: StoredSuggestion | null
   initialStage2: StoredSuggestion | null
   initialRemaining: number
+  initialSavedVocab: SavedVocabItem[]
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
@@ -45,7 +48,7 @@ const PROMPTS = [
   ['Something I want to fix', 'One thing I want to fix is '],
 ]
 
-export default function DiaryEditor({ date, timezone, initialStage1, initialStage2, initialRemaining }: Props) {
+export default function DiaryEditor({ date, timezone, initialStage1, initialStage2, initialRemaining, initialSavedVocab }: Props) {
   // ── Entry state ──────────────────────────────────────────────────────────
   const [content, setContent] = useState('')
   const [wordCount, setWordCount] = useState(0)
@@ -73,6 +76,9 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
   const [dismissed, setDismissed] = useState(false)
   const [editMode, setEditMode] = useState(false)
 
+  // ── Vocabulary state ─────────────────────────────────────────────────────
+  const [savedVocab, setSavedVocab] = useState<SavedVocabItem[]>(initialSavedVocab)
+
   // ── Derived ──────────────────────────────────────────────────────────────
   const activeSuggestion = activeStage === 2 && stage2 ? stage2 : stage1
   const hasSuggestionVisible = activeSuggestion !== null && !dismissed
@@ -90,6 +96,17 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
   const segments = useMemo(() => diffToSegments(diffSpans), [diffSpans])
   const originalSegments = useMemo(() => diffToOriginalSegments(diffSpans), [diffSpans])
   const diffChanges = useMemo(() => buildDiffChanges(diffSpans, safeChanges), [diffSpans, safeChanges])
+
+  // Which change indices have been saved to vocabulary
+  const savedChangeIndices = useMemo(() => {
+    if (savedVocab.length === 0) return new Set<number>()
+    const headwordSet = new Set(savedVocab.map(v => v.headword))
+    const indices = new Set<number>()
+    diffChanges.forEach((dc, idx) => {
+      if (dc.headword && headwordSet.has(dc.headword)) indices.add(idx)
+    })
+    return indices
+  }, [savedVocab, diffChanges])
 
   const stage1Drifted = stage1 != null && content.trim() !== stage1.source_content.trim()
   const contentDrifted = activeSuggestion != null && (
@@ -174,6 +191,98 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
     },
     [date, timezone]
   )
+
+  // ── Vocabulary callbacks ─────────────────────────────────────────────────
+  const handleVocabSave = useCallback(async (changeIndex: number, fragment: string) => {
+    const dc = diffChanges[changeIndex]
+    if (!dc) return
+
+    try {
+      // 1. Save the vocab item
+      const res = await fetch('/api/vocab/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entry_date: date,
+          display_form: fragment,
+          original_form: dc.original,
+          headword: dc.headword ?? fragment,
+          change_type: dc.type ?? 'vocabulary',
+        }),
+      })
+      if (!res.ok) return
+      const { saved } = await res.json() as { saved: SavedVocabItem }
+      setSavedVocab(prev => [...prev, saved])
+
+      // 2. Trigger async lookup (fire-and-forget, updates definition)
+      fetch('/api/vocab/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headword: dc.headword ?? fragment,
+          pos: dc.pos ?? '',
+        }),
+      }).then(async lookupRes => {
+        if (!lookupRes.ok) return
+        const { definition } = await lookupRes.json()
+        if (definition) {
+          setSavedVocab(prev => prev.map(v =>
+            v.headword === (dc.headword ?? fragment) && !v.definition
+              ? { ...v, definition }
+              : v
+          ))
+        }
+      }).catch(() => {})
+    } catch {
+      // silently fail
+    }
+  }, [diffChanges, date])
+
+  const handleVocabRemove = useCallback(async (changeIndex: number) => {
+    const dc = diffChanges[changeIndex]
+    if (!dc) return
+    const item = savedVocab.find(v => v.headword === dc.headword)
+    if (!item) return
+
+    try {
+      const res = await fetch(`/api/vocab/${item.id}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setSavedVocab(prev => prev.filter(v => v.id !== item.id))
+    } catch {
+      // silently fail
+    }
+  }, [diffChanges, savedVocab])
+
+  const handleVocabPanelRemove = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/vocab/${id}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setSavedVocab(prev => prev.filter(v => v.id !== id))
+    } catch {
+      // silently fail
+    }
+  }, [])
+
+  const handleRetryLookup = useCallback(async (headword: string, pos: string) => {
+    try {
+      const res = await fetch('/api/vocab/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ headword, pos }),
+      })
+      if (!res.ok) return
+      const { definition } = await res.json()
+      if (definition) {
+        setSavedVocab(prev => prev.map(v =>
+          v.headword === headword && !v.definition
+            ? { ...v, definition }
+            : v
+        ))
+      }
+    } catch {
+      // silently fail
+    }
+  }, [])
 
   // ── Suggestion fetch ─────────────────────────────────────────────────────
   const handleRequestStage = useCallback(async (stage: 1 | 2) => {
@@ -271,6 +380,15 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
           timezone={timezone}
           onPhotoCountChange={setPhotoCount}
         >
+          {/* ── Vocabulary panel ─────────────────────────────────────── */}
+          {savedVocab.length > 0 && (
+            <VocabPanel
+              items={savedVocab}
+              onRemove={handleVocabPanelRemove}
+              onRetryLookup={handleRetryLookup}
+            />
+          )}
+
           {/* ── Stage tabs ─────────────────────────────────────────── */}
           {showStageTabs && (
             <div className="flex gap-1 mb-3">
@@ -347,6 +465,9 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
                 selectedChange={selectedChange}
                 onSelectChange={handleSelectChange}
                 onDismiss={() => setDismissed(true)}
+                savedChangeIndices={savedChangeIndices}
+                onVocabSave={handleVocabSave}
+                onVocabRemove={handleVocabRemove}
               />
             </div>
           ) : (

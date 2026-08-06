@@ -5,6 +5,9 @@ export type Change = {
   corrected: string;
   type: ChangeType;
   explanation: string;
+  headword?: string;
+  pos?: string;
+  worth_saving?: boolean;
 };
 
 export type SuggestionPayload = {
@@ -48,12 +51,24 @@ export function filterChanges(items: unknown[]): Change[] {
         typeof r.explanation === 'string'
       );
     })
-    .map((item) => ({
-      original: item.original as string,
-      corrected: item.corrected as string,
-      type: item.type as ChangeType,
-      explanation: item.explanation as string,
-    }));
+    .map((item) => {
+      const change: Change = {
+        original: item.original as string,
+        corrected: item.corrected as string,
+        type: item.type as ChangeType,
+        explanation: item.explanation as string,
+      };
+      if (typeof item.headword === 'string' && item.headword) {
+        change.headword = item.headword;
+      }
+      if (typeof item.pos === 'string' && item.pos) {
+        change.pos = item.pos;
+      }
+      if (typeof item.worth_saving === 'boolean') {
+        change.worth_saving = item.worth_saving;
+      }
+      return change;
+    });
 }
 
 /**

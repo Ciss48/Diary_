@@ -17,6 +17,9 @@ export type DiffChange = {
   corrected: string
   type: ChangeType | null
   explanation: string | null
+  headword: string | null
+  pos: string | null
+  worthSaving: boolean
 }
 
 // ── Tokenizer ─────────────────────────────────────────────────────────────────
@@ -419,6 +422,9 @@ export function buildDiffChanges(
     // Try to match a model change
     let matchedType: ChangeType | null = null
     let matchedExplanation: string | null = null
+    let matchedHeadword: string | null = null
+    let matchedPos: string | null = null
+    let matchedWorthSaving = false
 
     for (let i = 0; i < modelChanges.length; i++) {
       if (used.has(i)) continue
@@ -434,6 +440,9 @@ export function buildDiffChanges(
       if (corrOverlap || origOverlap) {
         matchedType = mc.type
         matchedExplanation = mc.explanation
+        matchedHeadword = mc.headword ?? null
+        matchedPos = mc.pos ?? null
+        matchedWorthSaving = mc.worth_saving ?? false
         used.add(i)
         break
       }
@@ -444,6 +453,9 @@ export function buildDiffChanges(
       corrected: span.corrected,
       type: matchedType,
       explanation: matchedExplanation,
+      headword: matchedHeadword,
+      pos: matchedPos,
+      worthSaving: matchedWorthSaving,
     })
   }
 

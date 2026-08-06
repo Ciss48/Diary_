@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import type { Segment } from '@/lib/suggestions'
+import VocabPopover from '@/components/VocabPopover'
 
 const SCROLLBAR =
   '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent ' +
@@ -15,6 +16,9 @@ interface Props {
   selectedChange: number | null
   onSelectChange: (idx: number) => void
   onDismiss: () => void
+  savedChangeIndices: Set<number>
+  onVocabSave: (changeIndex: number, fragment: string) => void
+  onVocabRemove: (changeIndex: number) => void
 }
 
 /** Split segments into paragraphs on "\n\n" boundaries. */
@@ -41,8 +45,22 @@ export default function ImprovedVersionPane({
   selectedChange,
   onSelectChange,
   onDismiss,
+  savedChangeIndices,
+  onVocabSave,
+  onVocabRemove,
 }: Props) {
   const [copyLabel, setCopyLabel] = useState<'Copy' | 'Copied ✓' | 'Copy failed'>('Copy')
+  const [popover, setPopover] = useState<{ changeIndex: number; rect: DOMRect; text: string } | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Check for English voice (lazy, on first render)
+  const [hasEnglishVoice] = useState(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return false
+    const voices = window.speechSynthesis.getVoices()
+    // Voices might not be loaded yet on first render — fallback to true
+    // so button shows up; it'll just use default voice
+    return voices.length === 0 || voices.some(v => v.lang.startsWith('en-'))
+  })
 
   const paragraphs = useMemo(() => splitIntoParagraphs(segments), [segments])
 
@@ -56,6 +74,42 @@ export default function ImprovedVersionPane({
       setTimeout(() => setCopyLabel('Copy'), 3000)
     }
   }
+
+  const handleSpanClick = useCallback((changeIndex: number, e: React.MouseEvent<HTMLSpanElement>) => {
+    onSelectChange(changeIndex)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const text = (e.currentTarget as HTMLElement).textContent ?? ''
+    setPopover(prev =>
+      prev?.changeIndex === changeIndex
+        ? null // toggle off if same
+        : { changeIndex, rect, text }
+    )
+  }, [onSelectChange])
+
+  const handlePopoverClose = useCallback(() => {
+    setPopover(null)
+  }, [])
+
+  const handlePopoverCopy = useCallback(() => {
+    // Copy already handled in VocabPopover
+    setPopover(null)
+  }, [])
+
+  const handlePopoverSound = useCallback(() => {
+    // Sound already handled in VocabPopover
+  }, [])
+
+  const handlePopoverSave = useCallback(() => {
+    if (!popover) return
+    onVocabSave(popover.changeIndex, popover.text)
+    setPopover(null)
+  }, [popover, onVocabSave])
+
+  const handlePopoverRemove = useCallback(() => {
+    if (!popover) return
+    onVocabRemove(popover.changeIndex)
+    setPopover(null)
+  }, [popover, onVocabRemove])
 
   return (
     <div className="an-unroll flex flex-col h-[45vh] md:h-full min-h-0">
@@ -89,23 +143,38 @@ export default function ImprovedVersionPane({
 
         {/* Scrollable text */}
         <div
+          ref={scrollRef}
           className={`flex-1 min-h-0 overflow-y-auto px-[26px] py-[26px] pl-[34px]
             font-serif text-[16.5px] sm:text-[17.5px] leading-[1.78] text-ink ${SCROLLBAR}`}
         >
           {paragraphs.map((para, pi) => (
             <p key={pi} className="m-0 mb-[18px] last:mb-0">
-              {para.map((seg, si) =>
-                seg.changeIndex !== null ? (
+              {para.map((seg, si) => {
+                if (seg.changeIndex === null) {
+                  return <span key={si}>{seg.text}</span>
+                }
+                const isSaved = savedChangeIndices.has(seg.changeIndex)
+                const isSelected = selectedChange === seg.changeIndex
+                return (
                   <span
                     key={si}
-                    onClick={() => onSelectChange(seg.changeIndex!)}
+                    onClick={(e) => handleSpanClick(seg.changeIndex!, e)}
                     title="Click to see note"
                     className="rounded-[3px] cursor-pointer transition-[background,box-shadow] duration-[160ms]"
                     style={
-                      selectedChange === seg.changeIndex
+                      isSelected
                         ? {
                             background: 'var(--brass-soft)',
                             boxShadow: '0 0 0 2px var(--brass-soft), 0 0 0 3.5px var(--brass)',
+                          }
+                        : isSaved
+                        ? {
+                            background: 'transparent',
+                            textDecoration: 'underline',
+                            textDecorationColor: 'var(--brass)',
+                            textDecorationStyle: 'dashed' as const,
+                            textDecorationThickness: '2px',
+                            textUnderlineOffset: '3px',
                           }
                         : {
                             background: 'var(--leaf-soft)',
@@ -115,10 +184,8 @@ export default function ImprovedVersionPane({
                   >
                     {seg.text}
                   </span>
-                ) : (
-                  <span key={si}>{seg.text}</span>
                 )
-              )}
+              })}
             </p>
           ))}
         </div>
@@ -138,6 +205,22 @@ export default function ImprovedVersionPane({
           </button>
         </div>
       </div>
+
+      {/* Popover */}
+      {popover && (
+        <VocabPopover
+          anchorRect={popover.rect}
+          fragment={popover.text}
+          isSaved={savedChangeIndices.has(popover.changeIndex)}
+          hasEnglishVoice={hasEnglishVoice}
+          onCopy={handlePopoverCopy}
+          onSound={handlePopoverSound}
+          onSave={handlePopoverSave}
+          onRemove={handlePopoverRemove}
+          onClose={handlePopoverClose}
+          paneRef={scrollRef}
+        />
+      )}
     </div>
   )
 }

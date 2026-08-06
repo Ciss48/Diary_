@@ -4,6 +4,7 @@ import { isValidDateString, isFutureDate, getTodayInTimezone } from '@/lib/dates
 import DiaryEditor from '@/components/DiaryEditor'
 import { filterChanges } from '@/lib/suggestions'
 import type { StoredSuggestion } from '@/lib/suggestions'
+import type { SavedVocabItem } from '@/lib/vocab'
 
 interface Props {
   params: Promise<{ date: string }>
@@ -102,6 +103,34 @@ export default async function DiaryPage({ params }: Props) {
     .eq('usage_date', today)
   const initialRemaining = Math.max(0, limit - (count ?? 0))
 
+  // Load saved vocabulary for this entry (with joined definitions)
+  let initialSavedVocab: SavedVocabItem[] = []
+  if (entry?.id) {
+    const { data: vocabRows } = await supabase
+      .from('saved_vocab')
+      .select(`
+        id, display_form, original_form, headword, change_type, status, created_at,
+        vocab_definitions ( id, ipa, part_of_speech, definition, example, source )
+      `)
+      .eq('entry_id', entry.id)
+      .order('created_at', { ascending: true })
+
+    if (vocabRows) {
+      initialSavedVocab = vocabRows.map(row => ({
+        id: row.id,
+        display_form: row.display_form,
+        original_form: row.original_form,
+        headword: row.headword,
+        change_type: row.change_type,
+        status: row.status as 'learning' | 'known',
+        created_at: row.created_at,
+        definition: row.vocab_definitions
+          ? (row.vocab_definitions as unknown as SavedVocabItem['definition'])
+          : null,
+      }))
+    }
+  }
+
   return (
     <DiaryEditor
       date={date}
@@ -109,6 +138,7 @@ export default async function DiaryPage({ params }: Props) {
       initialStage1={initialStage1}
       initialStage2={initialStage2}
       initialRemaining={initialRemaining}
+      initialSavedVocab={initialSavedVocab}
     />
   )
 }

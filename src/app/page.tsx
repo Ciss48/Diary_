@@ -229,6 +229,17 @@ export default async function HomePage({
           longestRange={longestRange}
         />
 
+        {/* Vocabulary library link */}
+        <div>
+          <Link
+            href="/vocabulary"
+            className="hv-lift inline-block border-0 cursor-pointer bg-wax text-white font-sans text-[14.5px] font-medium
+              px-6 py-[14px] rounded-[11px] shadow-[var(--shadow-2)] hover:text-white"
+          >
+            Open your vocabulary library →
+          </Link>
+        </div>
+
         {/* Heatmap */}
         <HeatmapCard
           mode={mode}
