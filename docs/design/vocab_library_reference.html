@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400;1,7..72,500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="./image-slot.js"></script>
+<style>
+  :root{
+    --paper:#f6f1e7; --paper-2:#efe8da; --card:#fffdf8; --deckle:#e8dfcd;
+    --ink:#23201c; --ink-2:#5a5346; --ink-3:#8a7f6d;
+    --wax:#9c3b2c; --wax-soft:#f0dcd6; --leaf:#4f7b58; --leaf-deep:#2f4a37; --leaf-soft:#dfe8e0;
+    --brass:#c9a227; --brass-soft:#f3e7c4;
+    --line:rgba(35,32,28,.11); --line-2:rgba(35,32,28,.2);
+    --empty:#e4dccc; --future:rgba(35,32,28,.045);
+    --shadow-1:0 1px 2px rgba(58,45,26,.06);
+    --shadow-2:0 2px 6px rgba(58,45,26,.07), 0 10px 26px -14px rgba(58,45,26,.24);
+    --shadow-3:0 18px 44px -18px rgba(58,45,26,.4);
+    --grain:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22/></filter><rect width=%22180%22 height=%22180%22 filter=%22url(%23n)%22 opacity=%220.05%22/></svg>');
+  }
+  [data-theme="dark"]{
+    --paper:#171614; --paper-2:#1d1c19; --card:#211f1c; --deckle:#2a2723;
+    --ink:#ece7dc; --ink-2:#b3ab9c; --ink-3:#847c6d;
+    --wax:#d4694f; --wax-soft:#3a221c; --leaf:#6f9e78; --leaf-deep:#3d5c45; --leaf-soft:#203024;
+    --brass:#d9b452; --brass-soft:#3b3116;
+    --line:rgba(236,231,220,.1); --line-2:rgba(236,231,220,.2);
+    --empty:#2c2925; --future:rgba(236,231,220,.035);
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);
+    --shadow-2:0 2px 8px rgba(0,0,0,.44), 0 14px 30px -16px rgba(0,0,0,.7);
+    --shadow-3:0 20px 50px -20px rgba(0,0,0,.8);
+    --grain:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22/></filter><rect width=%22180%22 height=%22180%22 filter=%22url(%23n)%22 opacity=%220.11%22/></svg>');
+  }
+  body{margin:0;background:var(--paper);-webkit-font-smoothing:antialiased}
+  a{color:var(--wax);text-decoration:none}
+  a:hover{color:var(--ink)}
+  textarea{font:inherit}
+  textarea::placeholder{color:var(--ink-3);opacity:.75}
+  ::selection{background:var(--brass-soft);color:var(--ink)}
+  @keyframes unroll{from{opacity:0;transform:translateX(16px) rotate(.4deg)}to{opacity:1;transform:none}}
+  @keyframes riseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes inkPulse{0%,100%{opacity:.35}50%{opacity:.9}}
+  @keyframes nibSweep{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100vh;background:var(--paper);background-image:var(--grain);font-family:'Instrument Sans',Helvetica,Arial,sans-serif;color:var(--ink)">
+
+  <div style="position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:var(--shadow-1)">
+    <span style="font-family:Literata,Georgia,serif;font-size:15px;font-weight:600;letter-spacing:-.01em">Diary</span>
+    <span style="font-size:11px;letter-spacing:.14em;color:var(--ink-3)">INK &amp; ALMANAC</span>
+    <div style="display:flex;gap:2px;background:var(--paper-2);border-radius:9px;padding:3px;margin-left:8px">
+      <sc-for list="{{ screenTabs }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.go }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:6px 13px;border-radius:7px;transition:all 180ms cubic-bezier(.2,.7,.3,1);background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:2px;background:var(--paper-2);border-radius:9px;padding:3px">
+      <button onClick="{{ setDesktop }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:6px 13px;border-radius:7px;transition:all 180ms;background:{{ deskBg }};color:{{ deskFg }};box-shadow:{{ deskSh }}">Desktop</button>
+      <button onClick="{{ setMobile }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:6px 13px;border-radius:7px;transition:all 180ms;background:{{ mobBg }};color:{{ mobFg }};box-shadow:{{ mobSh }}">Mobile</button>
+    </div>
+    <button onClick="{{ toggleTheme }}" style="border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;font-family:inherit;font-size:12.5px;padding:6px 13px;border-radius:8px;transition:all 180ms" style-hover="border-color:var(--ink);color:var(--ink)">{{ themeLabel }}</button>
+    <sc-if value="{{ onSuggest }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:2px;background:var(--paper-2);border-radius:9px;padding:3px;margin-left:auto">
+        <sc-for list="{{ stateTabs }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.go }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:6px 13px;border-radius:7px;transition:all 180ms;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="max-width:{{ frameMax }};margin:0 auto;padding:{{ framePad }};box-sizing:border-box;border-left:{{ frameEdge }};border-right:{{ frameEdge }};min-height:80vh">
+
+  <!-- ══════════════ HOME ══════════════ -->
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:26px;animation:riseIn 320ms cubic-bezier(.2,.7,.3,1) both">
+
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;letter-spacing:.16em;color:var(--ink-3)">{{ todayLong }}</span>
+          <h1 style="margin:0;font-family:Literata,Georgia,serif;font-size:{{ h1Size }};font-weight:500;letter-spacing:-.02em">Good evening, Dũng</h1>
+        </div>
+        <a href="#" style="font-size:14px;color:var(--ink-3)">Sign out</a>
+      </div>
+
+      <div style="position:relative;border-radius:16px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-2)">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--wax)"></div>
+        <div style="display:grid;grid-template-columns:{{ statCols }};gap:1px;background:var(--line)">
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">CURRENT STREAK</span>
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em;color:var(--wax)">17</span>
+              <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:15px;color:var(--ink-3)">days</span>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <sc-for list="{{ streakBeads }}" as="b" hint-placeholder-count="7">
+                <span title="{{ b.tip }}" style="width:11px;height:11px;border-radius:3px;background:{{ b.bg }};box-shadow:{{ b.ring }}"></span>
+              </sc-for>
+              <span style="font-size:11px;color:var(--ink-3);margin-left:4px">last 7</span>
+            </div>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">LONGEST STREAK</span>
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em">31</span>
+              <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:15px;color:var(--ink-3)">days</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--ink-3);font-family:Literata,Georgia,serif;font-style:italic">Mar 2 – Apr 1, 2026</span>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">TOTAL ENTRIES</span>
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em">148</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--ink-3);font-family:Literata,Georgia,serif;font-style:italic">since Sep 2025</span>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">TOTAL WORDS</span>
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em">42,180</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--ink-3);font-family:Literata,Georgia,serif;font-style:italic">≈ a short novel</span>
+          </div>
+        </div>
+      </div>
+
+      <section style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-2);padding:{{ cardPad }};display:flex;flex-direction:column;gap:20px;overflow:hidden">
+        <div style="position:absolute;inset:0;background-image:var(--grain);pointer-events:none;opacity:.7"></div>
+        <div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <h2 style="margin:0;font-family:Literata,Georgia,serif;font-size:20px;font-weight:500;letter-spacing:-.01em">{{ rangeTitle }}</h2>
+            <span style="font-size:12.5px;color:var(--ink-3);font-family:Literata,Georgia,serif;font-style:italic">{{ rangeSub }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <div style="display:flex;gap:2px;background:var(--paper-2);border-radius:9px;padding:3px">
+              <button onClick="{{ setYear }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:7px 15px;border-radius:7px;transition:all 180ms;background:{{ yBg }};color:{{ yFg }};box-shadow:{{ ySh }}">Year</button>
+              <button onClick="{{ setMonth }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:7px 15px;border-radius:7px;transition:all 180ms;background:{{ mBg }};color:{{ mFg }};box-shadow:{{ mSh }}">Month</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <button onClick="{{ prev }}" style="width:32px;height:34px;border:1px solid var(--line-2);background:transparent;border-radius:8px;cursor:pointer;color:var(--ink-2);font-size:15px;line-height:1;transition:all 160ms" style-hover="border-color:var(--ink);color:var(--ink)">‹</button>
+              <sc-if value="{{ isYearView }}" hint-placeholder-val="{{ true }}">
+                <span style="font-family:'Space Grotesk',monospace;font-size:13.5px;font-weight:500;min-width:48px;text-align:center">{{ year }}</span>
+              </sc-if>
+              <sc-if value="{{ isMonthView }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:'Space Grotesk',monospace;font-size:13.5px;font-weight:500;min-width:112px;text-align:center">{{ monthLabel }}</span>
+              </sc-if>
+              <button onClick="{{ next }}" style="width:32px;height:34px;border:1px solid var(--line-2);background:transparent;border-radius:8px;cursor:pointer;color:var(--ink-2);font-size:15px;line-height:1;transition:all 160ms" style-hover="border-color:var(--ink);color:var(--ink)">›</button>
+            </div>
+          </div>
+        </div>
+
+        <sc-if value="{{ isYearView }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;display:flex;flex-direction:column;gap:7px;overflow-x:auto;animation:riseIn 280ms cubic-bezier(.2,.7,.3,1) both">
+            <div style="display:flex;gap:9px;min-width:{{ heatMin }}">
+              <div style="width:30px;flex:none"></div>
+              <div style="flex:1;display:grid;grid-template-columns:repeat({{ weekCount }},1fr);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3)">
+                <sc-for list="{{ monthTicks }}" as="t" hint-placeholder-count="12">
+                  <span style="grid-row:1;grid-column:{{ t.col }} / span 4">{{ t.text }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;gap:9px;min-width:{{ heatMin }}">
+              <div style="width:30px;flex:none;display:grid;grid-template-rows:repeat(7,1fr);gap:3px;font-size:10px;color:var(--ink-3);align-items:center">
+                <span>MON</span><span></span><span>WED</span><span></span><span>FRI</span><span></span><span>SUN</span>
+              </div>
+              <div style="flex:1;display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);grid-auto-columns:1fr;gap:3px">
+                <sc-for list="{{ yearCells }}" as="c" hint-placeholder-count="371">
+                  <div title="{{ c.tip }}" style="aspect-ratio:1;border-radius:3.5px;background:{{ c.bg }};border:{{ c.border }};box-shadow:{{ c.ring }};box-sizing:border-box;cursor:{{ c.cursor }};transition:transform 140ms cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.4)"></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isMonthView }}" hint-placeholder-val="{{ false }}">
+          <div style="position:relative;display:flex;flex-direction:column;gap:8px;animation:riseIn 280ms cubic-bezier(.2,.7,.3,1) both">
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:{{ calGap }};font-size:10.5px;font-weight:500;letter-spacing:.1em;color:var(--ink-3)">
+              <span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span><span>SUN</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:{{ calGap }}">
+              <sc-for list="{{ monthCells }}" as="c" hint-placeholder-count="35">
+                <div title="{{ c.tip }}" style="aspect-ratio:{{ calRatio }};border-radius:10px;background:{{ c.bg }};border:{{ c.border }};box-shadow:{{ c.ring }};box-sizing:border-box;padding:{{ calCellPad }};display:flex;flex-direction:column;justify-content:space-between;position:relative;cursor:{{ c.cursor }};opacity:{{ c.opacity }};transition:transform 160ms cubic-bezier(.2,.7,.3,1),box-shadow 160ms" style-hover="transform:translateY(-3px)">
+                  <span style="font-family:'Space Grotesk',monospace;font-size:{{ calDaySize }};font-weight:500;color:{{ c.fg }}">{{ c.day }}</span>
+                  <span style="position:absolute;top:{{ calCellPad }};right:{{ calCellPad }};width:7px;height:7px;border-radius:999px;background:{{ c.moodBg }};border:{{ c.moodBorder }};box-sizing:border-box"></span>
+                  <span style="font-size:10.5px;color:{{ c.metaFg }};font-family:'Space Grotesk',monospace">{{ c.meta }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="position:relative;display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:15px;font-size:12px;color:var(--ink-2)">
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:3.5px;background:var(--empty)"></span>No entry</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:3.5px;background:var(--leaf)"></span>Written on time</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:3.5px;background:repeating-linear-gradient(135deg,var(--leaf) 0 3px,var(--leaf-deep) 3px 6px)"></span>Backfilled</span>
+          <span style="display:flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:3.5px;background:var(--future);border:1px dashed var(--line-2);box-sizing:border-box"></span>Future</span>
+          <span style="display:flex;align-items:center;gap:7px;margin-left:auto"><span style="width:13px;height:13px;border-radius:3.5px;background:transparent;box-shadow:0 0 0 2px var(--brass)"></span>Today</span>
+          <span style="display:flex;align-items:center;gap:7px;padding-left:10px;border-left:1px solid var(--line)"><span style="width:8px;height:8px;border-radius:999px;background:var(--brass)"></span>happy<span style="width:8px;height:8px;border-radius:999px;background:var(--ink-3);margin-left:6px"></span>normal<span style="width:8px;height:8px;border-radius:999px;border:1.4px solid var(--ink-3);box-sizing:border-box;margin-left:6px"></span>sad</span>
+        </div>
+      </section>
+
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <button onClick="{{ goEntry }}" style="border:0;cursor:pointer;background:var(--wax);color:#fff;font-family:inherit;font-size:14.5px;font-weight:500;padding:14px 24px;border-radius:11px;box-shadow:var(--shadow-2);transition:transform 160ms cubic-bezier(.2,.7,.3,1),filter 160ms" style-hover="transform:translateY(-2px);filter:brightness(1.06)">Write today's entry</button>
+        <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:14px;color:var(--ink-3)">Keep the chain going — day 18 is one page away.</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════ ENTRY ══════════════ -->
+  <sc-if value="{{ isEntry }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:20px;animation:riseIn 320ms cubic-bezier(.2,.7,.3,1) both">
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <h1 style="margin:0;font-family:Literata,Georgia,serif;font-size:{{ h1Size }};font-weight:500;letter-spacing:-.02em">Friday, July 10, 2026</h1>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:500;letter-spacing:.1em;color:var(--wax);background:var(--wax-soft);border:1px solid var(--wax);border-radius:999px;padding:3px 10px">BACKFILLED</span>
+            <div style="display:flex;gap:6px;align-items:center;padding-left:6px">
+              <sc-for list="{{ moods }}" as="m" hint-placeholder-count="3">
+                <button onClick="{{ m.pick }}" title="{{ m.label }}" style="width:34px;height:34px;border-radius:999px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;transition:all 180ms cubic-bezier(.2,.7,.3,1);background:{{ m.bg }};border:{{ m.border }};color:{{ m.fg }};transform:{{ m.scale }}" style-hover="border-color:var(--ink)">{{ m.glyph }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-3)"><span style="width:7px;height:7px;border-radius:999px;background:var(--leaf);animation:inkPulse 2.4s ease-in-out infinite"></span>Saved · just now</span>
+          <a href="#" onClick="{{ goHome }}" style="font-size:14px;color:var(--ink-3)">← Home</a>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:{{ entryCols }};gap:{{ entryGap }};align-items:start">
+
+        <sc-if value="{{ wideRail }}" hint-placeholder-val="{{ true }}">
+          <aside style="display:flex;flex-direction:column;gap:28px;padding-top:26px;min-width:0">
+            <figure style="margin:0;background:var(--card);padding:10px 10px 0;border-radius:3px;box-shadow:var(--shadow-2);transform:rotate(-3.2deg);transition:transform 320ms cubic-bezier(.2,.7,.3,1),box-shadow 320ms;cursor:zoom-in" style-hover="transform:rotate(0) scale(1.05);box-shadow:var(--shadow-3)">
+              <image-slot id="ia-photo-1" shape="rect" style="width:100%;height:clamp(160px,17vw,220px);display:block" placeholder="Morning"></image-slot>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:13px;color:var(--ink-3);padding:9px 2px 11px;display:flex;justify-content:space-between;gap:8px"><span>Rushed coffee</span><span style="font-family:'Space Grotesk',monospace">08:40</span></figcaption>
+            </figure>
+            <figure style="margin:0;background:var(--card);padding:10px 10px 0;border-radius:3px;box-shadow:var(--shadow-2);transform:rotate(2.4deg);transition:transform 320ms cubic-bezier(.2,.7,.3,1),box-shadow 320ms;cursor:zoom-in" style-hover="transform:rotate(0) scale(1.05);box-shadow:var(--shadow-3)">
+              <image-slot id="ia-photo-2" shape="rect" style="width:100%;height:clamp(200px,22vw,290px);display:block" placeholder="At work"></image-slot>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:13px;color:var(--ink-3);padding:9px 2px 11px;display:flex;justify-content:space-between;gap:8px"><span>Desk, mid-chaos</span><span style="font-family:'Space Grotesk',monospace">14:12</span></figcaption>
+            </figure>
+          </aside>
+        </sc-if>
+
+        <main style="display:flex;flex-direction:column;gap:14px;min-width:0">
+          <div style="position:relative;border-radius:4px;background:var(--card);background-image:var(--grain);box-shadow:var(--shadow-2);border:1px solid var(--line);overflow:hidden">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--wax)"></div>
+            <div style="position:absolute;left:{{ ruleX }};top:0;bottom:0;width:1px;background:var(--wax);opacity:.22"></div>
+            <textarea value="{{ text }}" onChange="{{ onEdit }}" spellcheck="false" placeholder="Write your diary entry here…" style="position:relative;width:100%;height:{{ paperH }};box-sizing:border-box;border:0;outline:none;resize:none;background:transparent;padding:34px 34px 34px {{ textPad }};font-family:Literata,Georgia,serif;font-size:{{ bodySize }};line-height:1.78;color:var(--ink);caret-color:var(--wax)"></textarea>
+            <sc-if value="{{ isBlank }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;pointer-events:none;padding:40px;text-align:center">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:21px;color:var(--ink-3);max-width:34ch;line-height:1.5;text-wrap:pretty">The page is waiting. Three sentences count as a day.</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;pointer-events:auto">
+                  <sc-for list="{{ prompts }}" as="p" hint-placeholder-count="3">
+                    <button onClick="{{ p.use }}" style="border:1px dashed var(--line-2);background:transparent;color:var(--ink-2);font-family:Literata,Georgia,serif;font-style:italic;font-size:14px;padding:9px 15px;border-radius:999px;cursor:pointer;transition:all 180ms" style-hover="border-color:var(--wax);color:var(--wax);border-style:solid">{{ p.text }}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <button onClick="{{ goSuggest }}" style="border:0;cursor:pointer;background:var(--ink);color:var(--paper);font-family:inherit;font-size:14px;font-weight:500;padding:13px 22px;border-radius:10px;box-shadow:var(--shadow-1);transition:transform 160ms cubic-bezier(.2,.7,.3,1),filter 160ms" style-hover="transform:translateY(-2px)">Suggest better English</button>
+            <span style="font-size:12.5px;color:var(--ink-3)">5 suggestions left today</span>
+            <span style="margin-left:auto;font-family:'Space Grotesk',monospace;font-size:12.5px;color:var(--ink-3)">{{ wordCount }} words</span>
+          </div>
+        </main>
+
+        <sc-if value="{{ wideRail }}" hint-placeholder-val="{{ true }}">
+          <aside style="display:flex;flex-direction:column;gap:28px;padding-top:76px;min-width:0">
+            <figure style="margin:0;background:var(--card);padding:10px;border-radius:3px;box-shadow:var(--shadow-1);border:1px dashed var(--line-2);transform:rotate(3deg);transition:all 320ms cubic-bezier(.2,.7,.3,1);cursor:pointer" style-hover="transform:rotate(0) scale(1.04);border-color:var(--wax)">
+              <div style="height:clamp(200px,22vw,290px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--paper-2);border-radius:2px">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:15px;color:var(--ink-3)">Drop a photo</span>
+                <span style="font-size:11.5px;color:var(--ink-3)">or <a href="#">browse files</a></span>
+              </div>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:13px;color:var(--ink-3);padding:9px 2px 3px">Slot 3 of 4</figcaption>
+            </figure>
+            <figure style="margin:0;background:var(--card);padding:10px;border-radius:3px;box-shadow:var(--shadow-1);border:1px dashed var(--line-2);transform:rotate(-2.6deg);transition:all 320ms cubic-bezier(.2,.7,.3,1);cursor:pointer" style-hover="transform:rotate(0) scale(1.04);border-color:var(--wax)">
+              <div style="height:clamp(160px,17vw,220px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--paper-2);border-radius:2px">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:15px;color:var(--ink-3)">Drop a photo</span>
+                <span style="font-size:11.5px;color:var(--ink-3)">or <a href="#">browse files</a></span>
+              </div>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:13px;color:var(--ink-3);padding:9px 2px 3px">Slot 4 of 4</figcaption>
+            </figure>
+          </aside>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ narrowRail }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">PHOTOS · 2 OF 4</span>
+          <div style="display:flex;gap:14px;overflow-x:auto;padding:6px 2px 14px;scroll-snap-type:x mandatory">
+            <figure style="margin:0;flex:none;width:190px;scroll-snap-align:start;background:var(--card);padding:9px 9px 0;border-radius:3px;box-shadow:var(--shadow-2);transform:rotate(-2.4deg)">
+              <image-slot id="ia-photo-1" shape="rect" style="width:100%;height:180px;display:block" placeholder="Morning"></image-slot>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:12.5px;color:var(--ink-3);padding:8px 2px 10px;display:flex;justify-content:space-between"><span>Rushed coffee</span><span style="font-family:'Space Grotesk',monospace">08:40</span></figcaption>
+            </figure>
+            <figure style="margin:0;flex:none;width:190px;scroll-snap-align:start;background:var(--card);padding:9px 9px 0;border-radius:3px;box-shadow:var(--shadow-2);transform:rotate(2deg)">
+              <image-slot id="ia-photo-2" shape="rect" style="width:100%;height:180px;display:block" placeholder="At work"></image-slot>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:12.5px;color:var(--ink-3);padding:8px 2px 10px;display:flex;justify-content:space-between"><span>Desk</span><span style="font-family:'Space Grotesk',monospace">14:12</span></figcaption>
+            </figure>
+            <figure style="margin:0;flex:none;width:190px;scroll-snap-align:start;background:var(--card);padding:9px;border-radius:3px;border:1px dashed var(--line-2)">
+              <div style="height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--paper-2);border-radius:2px">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:14px;color:var(--ink-3)">Add a photo</span>
+              </div>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:12.5px;color:var(--ink-3);padding:8px 2px 2px">Slot 3 of 4</figcaption>
+            </figure>
+            <figure style="margin:0;flex:none;width:190px;scroll-snap-align:start;background:var(--card);padding:9px;border-radius:3px;border:1px dashed var(--line-2)">
+              <div style="height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--paper-2);border-radius:2px">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:14px;color:var(--ink-3)">Add a photo</span>
+              </div>
+              <figcaption style="font-family:Literata,Georgia,serif;font-size:12.5px;color:var(--ink-3);padding:8px 2px 2px">Slot 4 of 4</figcaption>
+            </figure>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════ SUGGESTION ══════════════ -->
+  <sc-if value="{{ isSuggest }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:20px;animation:riseIn 320ms cubic-bezier(.2,.7,.3,1) both">
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <h1 style="margin:0;font-family:Literata,Georgia,serif;font-size:{{ h1Size }};font-weight:500;letter-spacing:-.02em">Friday, July 10, 2026</h1>
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:11px;font-weight:500;letter-spacing:.1em;color:var(--wax);background:var(--wax-soft);border:1px solid var(--wax);border-radius:999px;padding:3px 10px">BACKFILLED</span>
+            <span style="font-size:12.5px;color:var(--ink-3)">Saved · 2 min ago</span>
+          </div>
+        </div>
+        <a href="#" onClick="{{ goHome }}" style="font-size:14px;color:var(--ink-3)">← Home</a>
+      </div>
+
+      <sc-if value="{{ hasVocab }}" hint-placeholder-val="{{ true }}">
+        <section style="position:relative;background:var(--card);background-image:var(--grain);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-2);padding:18px 22px 20px 26px;overflow:hidden;animation:riseIn 280ms cubic-bezier(.2,.7,.3,1) both">
+          <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--brass)"></span>
+          <div style="position:relative;display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+            <span style="font-size:10.5px;font-weight:500;letter-spacing:.15em;color:var(--ink-3)">VOCABULARY FROM THIS ENTRY</span>
+            <span style="font-family:'Space Grotesk',monospace;font-size:11px;font-weight:500;color:var(--brass);background:var(--brass-soft);padding:2px 8px;border-radius:999px">{{ vocabCount }} saved</span>
+            <span style="flex:1;height:1px;background:var(--line);min-width:20px"></span>
+            <a href="#" onClick="{{ goLibrary }}" style="font-size:12.5px;color:var(--ink-3)">Open library →</a>
+            <button onClick="{{ toggleVocab }}" style="border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;font-family:inherit;font-size:12px;padding:5px 12px;border-radius:7px;transition:all 160ms" style-hover="border-color:var(--ink);color:var(--ink)">{{ vocabToggle }}</button>
+          </div>
+          <sc-if value="{{ vocabOpen }}" hint-placeholder-val="{{ true }}">
+            <div style="position:relative;display:grid;grid-template-columns:{{ vocabCols }};gap:12px;margin-top:16px">
+              <sc-for list="{{ vocab }}" as="v" hint-placeholder-count="2">
+                <div style="position:relative;background:var(--paper-2);border:1px solid var(--line);border-radius:11px;padding:14px 16px;display:flex;flex-direction:column;gap:7px;transition:border-color 180ms" style-hover="border-color:var(--brass)">
+                  <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                    <span style="font-family:Literata,Georgia,serif;font-size:17px;font-weight:600;color:var(--ink)">{{ v.word }}</span>
+                    <button onClick="{{ v.say }}" title="Hear it" style="border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;width:24px;height:24px;border-radius:999px;font-size:12px;line-height:1;transition:all 160ms" style-hover="border-color:var(--leaf);color:var(--leaf)">♪</button>
+                    <span style="font-family:'Space Grotesk',monospace;font-size:12px;color:var(--ink-3)">{{ v.phon }}</span>
+                    <button onClick="{{ v.remove }}" title="Remove" style="margin-left:auto;border:0;background:transparent;color:var(--ink-3);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;transition:color 160ms" style-hover="color:var(--wax)">×</button>
+                  </div>
+                  <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:13px;color:var(--ink-3)">{{ v.pos }}</span>
+                  <p style="margin:0;font-size:13.5px;line-height:1.6;color:var(--ink-2);text-wrap:pretty">{{ v.def }}</p>
+                  <p style="margin:2px 0 0;font-family:Literata,Georgia,serif;font-style:italic;font-size:13.5px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">“{{ v.ex }}”</p>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:3px;padding-top:9px;border-top:1px solid var(--line)">
+                    <span style="font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:{{ v.chipFg }};background:{{ v.chipBg }};padding:2.5px 8px;border-radius:999px">{{ v.kind }}</span>
+                    <span style="font-size:12px;color:var(--ink-3)">you wrote “{{ v.from }}”</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </section>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:{{ suggestCols }};gap:18px;align-items:start">
+
+        <section style="display:flex;flex-direction:column;gap:9px;min-width:0">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;height:20px">
+            <span style="font-size:10.5px;font-weight:500;letter-spacing:.15em;color:var(--ink-3)">YOUR ENTRY</span>
+            <span style="font-family:'Space Grotesk',monospace;font-size:12px;color:var(--ink-3)">{{ wordCount }} words</span>
+          </div>
+          <div style="position:relative;border-radius:4px;background:var(--card);background-image:var(--grain);border:1px solid var(--line);box-shadow:var(--shadow-2);overflow:hidden;height:{{ colH }}">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--wax)"></div>
+            <textarea value="{{ text }}" onChange="{{ onEdit }}" spellcheck="false" style="position:relative;width:100%;height:100%;box-sizing:border-box;border:0;outline:none;resize:none;background:transparent;padding:26px 26px 26px {{ textPad }};font-family:Literata,Georgia,serif;font-size:{{ bodySize }};line-height:1.78;color:var(--ink);caret-color:var(--wax)"></textarea>
+          </div>
+        </section>
+
+        <section style="display:flex;flex-direction:column;gap:9px;min-width:0">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;height:20px">
+            <div style="display:flex;align-items:baseline;gap:9px">
+              <span style="font-size:10.5px;font-weight:500;letter-spacing:.15em;color:var(--leaf)">TUTOR'S COPY</span>
+              <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+                <span style="font-family:'Space Grotesk',monospace;font-size:11px;font-weight:500;color:var(--leaf);background:var(--leaf-soft);padding:2px 8px;border-radius:999px">{{ changeCount }} notes</span>
+              </sc-if>
+            </div>
+            <span style="font-size:12px;color:var(--ink-3)">5 suggestions left today</span>
+          </div>
+
+          <div data-pop-layer="1" style="position:relative;border-radius:4px;background:var(--card);background-image:var(--grain);border:1px solid var(--line);box-shadow:var(--shadow-2);overflow:hidden;height:{{ colH }};display:flex;flex-direction:column;animation:unroll 420ms cubic-bezier(.2,.7,.3,1) both">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--leaf)"></div>
+            <sc-if value="{{ pop }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:{{ popX }};top:{{ popY }};z-index:30;display:flex;align-items:stretch;width:236px;box-sizing:border-box;background:var(--card);border:1px solid var(--line-2);border-radius:10px;box-shadow:var(--shadow-3);padding:4px;white-space:nowrap;animation:riseIn 160ms cubic-bezier(.2,.7,.3,1) both">
+                <button onClick="{{ popCopy }}" title="Copy the word" style="border:0;background:transparent;cursor:pointer;font-family:inherit;font-size:12.5px;color:var(--ink-2);padding:7px 10px;border-radius:7px;transition:all 140ms" style-hover="background:var(--paper-2);color:var(--ink)">Copy</button>
+                <span style="width:1px;background:var(--line);margin:5px 1px"></span>
+                <button onClick="{{ popSound }}" title="Hear it" style="border:0;background:transparent;cursor:pointer;font-family:inherit;font-size:13px;color:{{ popSoundFg }};padding:7px 10px;border-radius:7px;transition:all 140ms" style-hover="background:var(--paper-2);color:var(--leaf)">♪</button>
+                <span style="width:1px;background:var(--line);margin:5px 1px"></span>
+                <button onClick="{{ popNote }}" title="Note to vocabulary" style="flex:1;justify-content:center;border:0;background:{{ popNoteBg }};cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;color:{{ popNoteFg }};padding:7px 10px;border-radius:7px;transition:all 140ms;display:flex;align-items:center;gap:6px" style-hover="background:var(--brass-soft);color:var(--brass)"><span style="font-size:13px">✎</span>{{ popNoteLabel }}</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:19px;color:var(--ink-3);max-width:30ch;line-height:1.55;text-wrap:pretty">When you're done writing, I'll read it and leave notes in the margin.</span>
+                <button onClick="{{ runLoading }}" style="border:0;cursor:pointer;background:var(--ink);color:var(--paper);font-family:inherit;font-size:14px;font-weight:500;padding:12px 20px;border-radius:10px;transition:transform 160ms" style-hover="transform:translateY(-2px)">Suggest better English</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;display:flex;flex-direction:column;gap:16px;padding:26px 26px 26px 34px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span style="width:8px;height:8px;border-radius:999px;background:var(--leaf);animation:inkPulse 1.4s ease-in-out infinite"></span>
+                  <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:15px;color:var(--ink-2)">Reading your entry…</span>
+                </div>
+                <sc-for list="{{ skeleton }}" as="s" hint-placeholder-count="9">
+                  <div style="position:relative;height:13px;border-radius:3px;background:var(--paper-2);width:{{ s.w }};overflow:hidden">
+                    <div style="position:absolute;inset:0;width:34%;background:linear-gradient(90deg,transparent,var(--leaf-soft),transparent);animation:nibSweep 1.6s linear infinite;animation-delay:{{ s.d }}"></div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center">
+                <span style="font-family:Literata,Georgia,serif;font-size:19px;color:var(--wax)">The note came back blank.</span>
+                <span style="font-size:13.5px;color:var(--ink-3);max-width:34ch;line-height:1.6;text-wrap:pretty">Something went wrong on our side. Your entry is safe and unchanged.</span>
+                <button onClick="{{ runLoading }}" style="border:1px solid var(--wax);background:transparent;color:var(--wax);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:500;padding:10px 18px;border-radius:9px;transition:all 160ms" style-hover="background:var(--wax);color:#fff">Try again</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+              <div onScroll="{{ closePop }}" style="flex:1;overflow-y:auto;padding:26px 26px 26px 34px;font-family:Literata,Georgia,serif;font-size:{{ bodySize }};line-height:1.78;color:var(--ink)">
+                <sc-for list="{{ paras }}" as="pg" hint-placeholder-count="4">
+                  <p style="margin:0 0 18px"><sc-for list="{{ pg.tokens }}" as="tk" hint-placeholder-count="6"><span><span style="position:relative"><span onClick="{{ tk.select }}" title="{{ tk.title }}" style="background:{{ tk.bg }};box-shadow:{{ tk.ring }};border-radius:3px;cursor:{{ tk.cursor }};transition:background 160ms,box-shadow 160ms;text-decoration:{{ tk.deco }};text-decoration-color:var(--brass);text-decoration-thickness:2px;text-underline-offset:3px">{{ tk.mark }}</span></span>{{ tk.tail }}</span></sc-for></p>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+              <div style="border-top:1px solid var(--line);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--paper-2)">
+                <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:12.5px;color:var(--ink-3)">Your own words stay exactly as you wrote them.</span>
+                <button onClick="{{ copy }}" style="border:1px solid var(--line-2);background:var(--card);cursor:pointer;font-family:inherit;font-size:13px;color:var(--ink);padding:8px 15px;border-radius:8px;transition:all 160ms" style-hover="border-color:var(--ink)">{{ copyLabel }}</button>
+              </div>
+            </sc-if>
+          </div>
+        </section>
+      </div>
+
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <section style="display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-size:10.5px;font-weight:500;letter-spacing:.15em;color:var(--ink-3)">MARGIN NOTES</span>
+            <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:13px;color:var(--ink-3)">tap a highlight above to jump here</span>
+          </div>
+          <div style="display:grid;grid-template-columns:{{ noteCols }};gap:10px">
+            <sc-for list="{{ changes }}" as="c" hint-placeholder-count="8">
+              <div onClick="{{ c.select }}" style="position:relative;background:{{ c.bg }};border:1px solid {{ c.border }};border-radius:11px;padding:13px 15px 13px 17px;cursor:pointer;transition:all 180ms cubic-bezier(.2,.7,.3,1);box-shadow:{{ c.shadow }};overflow:hidden" style-hover="border-color:var(--ink-3)">
+                <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ c.stripe }}"></span>
+                <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+                  <span style="font-family:Literata,Georgia,serif;font-size:15px;color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--wax)">{{ c.from }}</span>
+                  <span style="color:var(--ink-3);font-size:13px">→</span>
+                  <span style="font-family:Literata,Georgia,serif;font-size:15px;font-weight:500;color:var(--ink)">{{ c.to }}</span>
+                  <span style="margin-left:auto;font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:{{ c.chipFg }};background:{{ c.chipBg }};padding:2.5px 8px;border-radius:999px">{{ c.kind }}</span>
+                </div>
+                <p style="margin:7px 0 0;font-size:13px;line-height:1.55;color:var(--ink-2);text-wrap:pretty">{{ c.why }}</p>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:10px">
+                  <button onClick="{{ c.say }}" style="border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;font-family:inherit;font-size:12px;padding:5px 11px;border-radius:7px;display:flex;align-items:center;gap:5px;transition:all 160ms" style-hover="border-color:var(--leaf);color:var(--leaf)"><span style="font-size:12px">♪</span>Sound</button>
+                  <button onClick="{{ c.note }}" style="border:1px solid {{ c.noteBorder }};background:{{ c.noteBg }};color:{{ c.noteFg }};cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;padding:5px 11px;border-radius:7px;display:flex;align-items:center;gap:5px;transition:all 160ms" style-hover="border-color:var(--brass);color:var(--brass)"><span style="font-size:12px">✎</span>{{ c.noteLabel }}</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="position:relative;background:var(--card);background-image:var(--grain);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-2);padding:22px 26px 24px 30px;overflow:hidden">
+          <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--brass)"></span>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:10.5px;font-weight:500;letter-spacing:.15em;color:var(--ink-3)">A NOTE FROM YOUR TUTOR</span>
+            <span style="flex:1;height:1px;background:var(--line)"></span>
+          </div>
+          <p style="margin:0;font-family:Literata,Georgia,serif;font-size:16px;line-height:1.72;color:var(--ink);text-wrap:pretty;max-width:78ch">{{ feedback }}</p>
+          <p style="margin:14px 0 0;font-family:Literata,Georgia,serif;font-style:italic;font-size:14px;color:var(--ink-3)">— see you tomorrow, same page</p>
+        </section>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════ LIBRARY ══════════════ -->
+  <sc-if value="{{ isLibrary }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:22px;animation:riseIn 320ms cubic-bezier(.2,.7,.3,1) both">
+
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;letter-spacing:.16em;color:var(--ink-3)">EVERY WORD YOU KEPT</span>
+          <h1 style="margin:0;font-family:Literata,Georgia,serif;font-size:{{ h1Size }};font-weight:500;letter-spacing:-.02em">Vocabulary library</h1>
+        </div>
+        <a href="#" onClick="{{ goHome }}" style="font-size:14px;color:var(--ink-3)">← Home</a>
+      </div>
+
+      <div style="position:relative;border-radius:16px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-2)">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--brass)"></div>
+        <div style="display:grid;grid-template-columns:{{ statCols }};gap:1px;background:var(--line)">
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">WORDS KEPT</span>
+            <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em;color:var(--brass)">{{ libTotal }}</span>
+            <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:11.5px;color:var(--ink-3)">{{ libStreakNote }}</span>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">THIS WEEK</span>
+            <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em">{{ libWeek }}</span>
+            <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:11.5px;color:var(--ink-3)">from 5 entries</span>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">MARKED KNOWN</span>
+            <span style="font-family:'Space Grotesk',monospace;font-size:{{ statBig }};font-weight:700;line-height:.9;letter-spacing:-.03em">{{ libKnown }}</span>
+            <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:11.5px;color:var(--ink-3)">tap ☆ to promote a word</span>
+          </div>
+          <div style="background:var(--card);padding:{{ statPad }};display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">MOST COMMON KIND</span>
+            <span style="font-family:Literata,Georgia,serif;font-size:24px;font-weight:500;line-height:1.1">Grammar</span>
+            <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:11.5px;color:var(--ink-3)">6 of your notes — worth a drill</span>
+          </div>
+        </div>
+      </div>
+
+      <section style="position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-1);padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="position:relative;flex:1;min-width:190px">
+            <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search a word or meaning…" style="width:100%;box-sizing:border-box;border:1px solid var(--line-2);background:var(--paper-2);border-radius:9px;padding:10px 13px;font-family:inherit;font-size:13.5px;color:var(--ink);outline:none;transition:border-color 160ms" style-focus="border-color:var(--brass)" />
+          </div>
+          <div style="display:flex;gap:2px;background:var(--paper-2);border-radius:9px;padding:3px">
+            <button onClick="{{ setSortNew }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:7px 14px;border-radius:7px;transition:all 180ms;background:{{ sortNewBg }};color:{{ sortNewFg }};box-shadow:{{ sortNewSh }}">By date</button>
+            <button onClick="{{ setSortAz }}" style="border:0;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;padding:7px 14px;border-radius:7px;transition:all 180ms;background:{{ sortAzBg }};color:{{ sortAzFg }};box-shadow:{{ sortAzSh }}">A – Z</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:13px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ rangeChips }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.go }}" style="border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.fg }};cursor:pointer;font-family:inherit;font-size:12.5px;padding:6px 13px;border-radius:999px;transition:all 160ms" style-hover="border-color:var(--ink)">{{ c.label }}</button>
+            </sc-for>
+          </div>
+          <span style="width:1px;height:22px;background:var(--line)"></span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <sc-for list="{{ kindChips }}" as="c" hint-placeholder-count="5">
+              <button onClick="{{ c.go }}" style="border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.fg }};cursor:pointer;font-family:inherit;font-size:12.5px;padding:6px 13px;border-radius:999px;transition:all 160ms" style-hover="border-color:var(--ink)">{{ c.label }}</button>
+            </sc-for>
+          </div>
+          <span style="margin-left:auto;font-family:'Space Grotesk',monospace;font-size:12.5px;color:var(--ink-3)">{{ libCount }} shown</span>
+        </div>
+      </section>
+
+      <sc-if value="{{ libEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--card);background-image:var(--grain);border:1px dashed var(--line-2);border-radius:14px;padding:56px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+          <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:20px;color:var(--ink-3);max-width:32ch;line-height:1.5;text-wrap:pretty">Nothing here yet — no word matches that filter.</span>
+          <button onClick="{{ clearQ }}" style="border:1px solid var(--line-2);background:transparent;color:var(--ink-2);cursor:pointer;font-family:inherit;font-size:13.5px;padding:10px 18px;border-radius:9px;transition:all 160ms" style-hover="border-color:var(--ink);color:var(--ink)">Clear filters</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ libHas }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <sc-for list="{{ libGroups }}" as="g" hint-placeholder-count="6">
+            <section style="display:flex;flex-direction:column;gap:11px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-family:Literata,Georgia,serif;font-size:16px;font-weight:500;color:var(--ink)">{{ g.label }}</span>
+                <span style="font-family:'Space Grotesk',monospace;font-size:11.5px;color:var(--ink-3)">{{ g.count }}</span>
+                <span style="flex:1;height:1px;background:var(--line)"></span>
+              </div>
+              <div style="display:grid;grid-template-columns:{{ libCols }};gap:12px">
+                <sc-for list="{{ g.items }}" as="v" hint-placeholder-count="4">
+                  <div style="position:relative;background:var(--card);background-image:var(--grain);border:1px solid {{ v.cardBorder }};border-radius:12px;box-shadow:var(--shadow-1);padding:15px 17px;display:flex;flex-direction:column;gap:7px;transition:transform 180ms cubic-bezier(.2,.7,.3,1),box-shadow 180ms" style-hover="transform:translateY(-2px);box-shadow:var(--shadow-2)">
+                    <div style="display:flex;align-items:baseline;gap:9px;min-width:0">
+                      <span style="font-family:Literata,Georgia,serif;font-size:18px;font-weight:600;color:var(--ink);flex:1 1 auto;min-width:0">{{ v.word }}</span>
+                      <button onClick="{{ v.say }}" title="Hear it" style="flex:none;border:1px solid var(--line-2);background:transparent;color:{{ v.soundFg }};cursor:pointer;width:24px;height:24px;border-radius:999px;font-size:12px;line-height:1;transition:all 160ms" style-hover="border-color:var(--leaf);color:var(--leaf)">♪</button>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:9px">
+                      <span style="font-family:'Space Grotesk',monospace;font-size:12px;color:var(--ink-3)">{{ v.phon }}</span>
+                      <span style="font-family:Literata,Georgia,serif;font-style:italic;font-size:13px;color:var(--ink-3)">{{ v.pos }}</span>
+                    </div>
+                    <p style="margin:0;font-size:13.5px;line-height:1.6;color:var(--ink-2);text-wrap:pretty">{{ v.def }}</p>
+                    <p style="margin:2px 0 0;font-family:Literata,Georgia,serif;font-style:italic;font-size:13.5px;line-height:1.55;color:var(--ink-3);text-wrap:pretty">“{{ v.ex }}”</p>
+                    <div style="display:flex;align-items:center;gap:9px;margin-top:4px;padding-top:10px;border-top:1px solid var(--line);flex-wrap:wrap">
+                      <span style="font-size:10.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:{{ v.chipFg }};background:{{ v.chipBg }};padding:2.5px 8px;border-radius:999px">{{ v.kind }}</span>
+                      <span style="font-size:12px;color:var(--ink-3)">you wrote “{{ v.from }}”</span>
+                      <a href="#" style="font-size:12px;color:var(--ink-3)">{{ v.when }} entry →</a>
+                      <button onClick="{{ v.toggle }}" title="{{ v.starLabel }}" style="margin-left:auto;flex:none;border:1px solid {{ v.starBorder }};background:{{ v.starBg }};color:{{ v.starFg }};cursor:pointer;font-family:inherit;font-size:12px;padding:4px 10px;border-radius:999px;display:flex;align-items:center;gap:5px;transition:all 160ms" style-hover="border-color:var(--brass);color:var(--brass)"><span style="font-size:12px">{{ v.starGlyph }}</span>{{ v.starLabel }}</button>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ══════════════ TOKENS ══════════════ -->
+  <sc-if value="{{ isTokens }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:24px;animation:riseIn 320ms cubic-bezier(.2,.7,.3,1) both">
+      <h1 style="margin:0;font-family:Literata,Georgia,serif;font-size:{{ h1Size }};font-weight:500;letter-spacing:-.02em">Style tokens</h1>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">COLOUR · LIGHT / DARK</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px">
+          <sc-for list="{{ colorTokens }}" as="t" hint-placeholder-count="14">
+            <div style="border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--card)">
+              <div style="height:52px;background:{{ t.swatch }}"></div>
+              <div style="padding:9px 11px;display:flex;flex-direction:column;gap:2px">
+                <span style="font-family:'Space Grotesk',monospace;font-size:12px">{{ t.name }}</span>
+                <span style="font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3)">{{ t.light }}</span>
+                <span style="font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3)">{{ t.dark }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="display:grid;grid-template-columns:{{ tokenCols }};gap:18px">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:11px">
+          <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">TYPE SCALE</span>
+          <sc-for list="{{ typeTokens }}" as="t" hint-placeholder-count="8">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px;border-bottom:1px solid var(--line);padding-bottom:7px">
+              <span style="font-family:{{ t.family }};font-size:{{ t.size }};line-height:1.2;color:var(--ink)">{{ t.label }}</span>
+              <span style="font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3);white-space:nowrap">{{ t.spec }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">SPACING · 4PT BASE</span>
+            <div style="display:flex;gap:8px;align-items:flex-end">
+              <sc-for list="{{ spaceTokens }}" as="s" hint-placeholder-count="7">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+                  <div style="width:{{ s.px }};height:{{ s.px }};background:var(--wax);opacity:.75;border-radius:2px"></div>
+                  <span style="font-family:'Space Grotesk',monospace;font-size:10px;color:var(--ink-3)">{{ s.px }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:12.5px;color:var(--ink-2);line-height:1.5">Card padding 24 / 26. Gutter 18–20. Section rhythm 26.</span>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:11px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">ELEVATION</span>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <div style="flex:1;min-width:88px;height:56px;border-radius:10px;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow-1);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3)">sh-1</div>
+              <div style="flex:1;min-width:88px;height:56px;border-radius:10px;background:var(--card);box-shadow:var(--shadow-2);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3)">sh-2</div>
+              <div style="flex:1;min-width:88px;height:56px;border-radius:10px;background:var(--card);box-shadow:var(--shadow-3);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',monospace;font-size:11px;color:var(--ink-3)">sh-3</div>
+            </div>
+            <span style="font-size:12.5px;color:var(--ink-2);line-height:1.5">Radius: 3–4 photo &amp; paper · 10–11 controls · 14–16 cards · 999 pills.</span>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10.5px;letter-spacing:.15em;color:var(--ink-3)">MOTION</span>
+            <sc-for list="{{ motionTokens }}" as="m" hint-placeholder-count="5">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--line);padding-bottom:6px">
+                <span>{{ m.name }}</span>
+                <span style="font-family:'Space Grotesk',monospace;font-size:11.5px;color:var(--ink-3);text-align:right">{{ m.spec }}</span>
+              </div>
+            </sc-for>
+            <span style="font-size:12.5px;color:var(--ink-2);line-height:1.5">Everything collapses to 0.001ms under <span style="font-family:'Space Grotesk',monospace;font-size:11.5px">prefers-reduced-motion</span>. Nothing animates on the writing surface.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1500,&quot;height&quot;:980}}">
+const ENTRY = `Today was a very busy day for me. In the morning, I woke up late because my alarm clock didn't rang. I was so hurry to go to work that I forgot my wallet at home. When I arrived to the office, my manager was already there and she looked very strictly.
+
+During the lunch time, I ate with my colleague at a small restaurant near here. The food was so delicous, especially the fried chicken, but the price was a little bit expensive. We talked about our work and future plans. My colleague suggested me to learn more about programming, which I think is a good advice.
+
+In the afternoon, I had an important meeting with clients. I was very nervous because my English skill is not good enough to present. However, my boss helped me a lot and the meeting ended successful.
+
+After finishing work, I went back home by bus. Traffic was very crowded today, so I felt very tired. When I arrived home, I cooked dinner and watched a comfortable movie on TV. Now I am writing this diary before go to sleep. I hope tomorrow will be a more better day than today!`;
+
+const CHANGES = [
+  { from: "didn't rang", to: "didn't ring", kind: "grammar", why: "After the auxiliary “didn't”, the main verb stays in its base form." },
+  { from: "so hurry", to: "in such a hurry", kind: "vocabulary", why: "“In such a hurry” is the natural phrase for urgency; “hurry” is a noun here." },
+  { from: "arrived to", to: "arrived at", kind: "grammar", why: "“Arrive” takes “at” for a specific place, “in” for a city or country." },
+  { from: "looked very strictly", to: "looked very strict", kind: "grammar", why: "After a linking verb like “looked”, use an adjective, not an adverb." },
+  { from: "delicous", to: "delicious", kind: "spelling", why: "Spelling — the “i” before “ous”." },
+  { from: "the lunch time", to: "lunchtime", kind: "style", why: "“Lunchtime” is the usual compound noun and reads more naturally." },
+  { from: "suggested me to learn", to: "suggested that I learn", kind: "grammar", why: "“Suggest” is followed by a that-clause, never by “someone to do”." },
+  { from: "a good advice", to: "good advice", kind: "grammar", why: "“Advice” is uncountable, so it takes no article." },
+  { from: "skill is", to: "skills are", kind: "grammar", why: "A plural subject needs a plural verb." },
+  { from: "ended successful", to: "ended successfully", kind: "grammar", why: "Use an adverb to describe how the meeting ended." },
+  { from: "a comfortable movie", to: "a comforting movie", kind: "vocabulary", why: "“Comforting” describes something that makes you feel at ease; “comfortable” describes physical comfort." },
+  { from: "before go to sleep", to: "before I go to sleep", kind: "grammar", why: "The clause needs its subject “I” to be complete." },
+  { from: "a more better day", to: "a better day", kind: "grammar", why: "“Better” is already comparative, so “more” is redundant." },
+];
+
+// improved text as a token stream; numbers index CHANGES
+const STREAM = [
+  "Today was a very busy day for me. In the morning, I woke up late because my alarm clock ", 0,
+  ". I was ", 1, " to go to work that I forgot my wallet at home. When I ", 2,
+  " the office, my manager was already there and she ", 3,
+  ".\n\nDuring ", 5, ", I ate with my colleague at a small restaurant nearby. The food was so ", 4,
+  ", especially the fried chicken, but the price was a little bit expensive. We talked about our work and future plans. My colleague ", 6,
+  " more about programming, which I think is ", 7,
+  ".\n\nIn the afternoon, I had an important meeting with clients. I was very nervous because my English ", 8,
+  " not good enough to present. However, my boss helped me a lot and the meeting ", 9,
+  ".\n\nAfter finishing work, I went back home by bus. Traffic was very heavy today, so I felt very tired. When I arrived home, I cooked dinner and watched ", 10,
+  " on TV. Now I am writing this diary ", 11, ". I hope tomorrow will be ", 12, "!",
+];
+
+const FEEDBACK = "You described a full, busy day and kept the story easy to follow from morning to night — that is the hardest part, and you already do it well. Most of today's notes are the same two habits: prepositions after verbs of movement (“arrived at”, not “arrived to”) and choosing between an adjective and an adverb (“looked strict”, but “ended successfully”). Both are worth five minutes of attention tomorrow, because fixing them alone would remove more than half of these notes. Your vocabulary is reaching for the right idea — “comfortable movie” is a lovely near-miss for “comforting”. Keep reaching; near-misses are how the range grows.";
+
+// Cambridge-style gloss for anything the tutor introduced
+const DICT = {
+  "didn't ring": { phon: "/rɪŋ/", pos: "verb", def: "To make the sound of a bell — used for alarms, phones and doorbells.", ex: "My alarm didn't ring this morning." },
+  "in such a hurry": { phon: "/ɪn sʌtʃ ə ˈhʌr.i/", pos: "phrase", def: "Rushing, with too little time to do something calmly.", ex: "She was in such a hurry that she forgot her keys." },
+  "arrived at": { phon: "/əˈraɪvd ət/", pos: "phrasal verb", def: "To reach a specific place such as a building, station or airport.", ex: "We arrived at the office just before nine." },
+  "looked very strict": { phon: "/strɪkt/", pos: "adjective", def: "Expecting rules to be obeyed and not accepting excuses.", ex: "My manager looked very strict that morning." },
+  "delicious": { phon: "/dɪˈlɪʃ.əs/", pos: "adjective", def: "Having a very pleasant taste or smell.", ex: "The fried chicken was delicious." },
+  "lunchtime": { phon: "/ˈlʌntʃ.taɪm/", pos: "noun", def: "The period in the middle of the day when people usually eat lunch.", ex: "We talked about our plans over lunchtime." },
+  "suggested that I learn": { phon: "/səˈdʒes.tɪd/", pos: "verb pattern", def: "To propose an idea — followed by a that-clause, never by “someone to do”.", ex: "He suggested that I learn programming." },
+  "good advice": { phon: "/ədˈvaɪs/", pos: "noun (uncountable)", def: "An opinion about what someone should do; it takes no article and has no plural.", ex: "That was good advice." },
+  "skills are": { phon: "/skɪlz/", pos: "noun (plural)", def: "Abilities gained through training or practice.", ex: "My English skills are improving." },
+  "ended successfully": { phon: "/səkˈses.fəl.i/", pos: "adverb", def: "In a way that achieves the intended result.", ex: "The meeting ended successfully." },
+  "a comforting movie": { phon: "/ˈkʌm.fə.tɪŋ/", pos: "adjective", def: "Making you feel calmer, safer or less sad.", ex: "I watched a comforting movie after work." },
+  "before I go to sleep": { phon: "/sliːp/", pos: "clause", def: "A time clause needs its own subject — “before I go”, not “before go”.", ex: "I write my diary before I go to sleep." },
+  "a better day": { phon: "/ˈbet.ər/", pos: "adjective (comparative)", def: "Already comparative, so it is never used with “more”.", ex: "I hope tomorrow is a better day." },
+};
+const gloss = (w) => DICT[w] || { phon: "", pos: "phrase", def: "Saved from your entry — you can add your own note in the library.", ex: "" };
+
+const CHIPS = {
+  grammar:   { bg: "var(--wax-soft)",   fg: "var(--wax)" },
+  vocabulary:{ bg: "var(--brass-soft)", fg: "var(--brass)" },
+  style:     { bg: "var(--leaf-soft)",  fg: "var(--leaf)" },
+  spelling:  { bg: "var(--paper-2)",    fg: "var(--ink-2)" },
+};
+
+// ── vocabulary library (mock) ────────────────────────────────
+// d = days before "today"; kind mirrors the note that produced it
+const LIBRARY = [
+  { w: "a comforting movie", ph: "/ˈkʌm.fə.tɪŋ/", pos: "adjective", def: "Making you feel calmer, safer or less sad.", ex: "I watched a comforting movie after work.", from: "a comfortable movie", kind: "vocabulary", d: 0 },
+  { w: "delicious", ph: "/dɪˈlɪʃ.əs/", pos: "adjective", def: "Having a very pleasant taste or smell.", ex: "The fried chicken was delicious.", from: "delicous", kind: "spelling", d: 0 },
+  { w: "arrived at", ph: "/əˈraɪvd ət/", pos: "phrasal verb", def: "To reach a specific place such as a building, station or airport.", ex: "We arrived at the office just before nine.", from: "arrived to", kind: "grammar", d: 1 },
+  { w: "in such a hurry", ph: "/ɪn sʌtʃ ə ˈhʌr.i/", pos: "phrase", def: "Rushing, with too little time to do something calmly.", ex: "She was in such a hurry that she forgot her keys.", from: "so hurry", kind: "vocabulary", d: 1 },
+  { w: "overslept", ph: "/ˌəʊ.vəˈslept/", pos: "verb", def: "To sleep for longer than you intended.", ex: "I overslept and missed the first meeting.", from: "still woke up late at", kind: "style", d: 3 },
+  { w: "unproductive", ph: "/ˌʌn.prəˈdʌk.tɪv/", pos: "adjective", def: "Not achieving much; producing little useful result.", ex: "It was an unproductive afternoon.", from: "not a productive", kind: "style", d: 3 },
+  { w: "see them through", ph: "/siː ðəm θruː/", pos: "idiom", def: "To continue with plans until they are finished.", ex: "I made plans but didn't see them through.", from: "finish my plans", kind: "vocabulary", d: 4 },
+  { w: "due to", ph: "/djuː tə/", pos: "preposition", def: "Because of; used to give the reason for something.", ex: "I skipped the gym due to a wrist injury.", from: "because of a", kind: "style", d: 6 },
+  { w: "good advice", ph: "/ədˈvaɪs/", pos: "noun (uncountable)", def: "An opinion about what someone should do; no article, no plural.", ex: "That was good advice.", from: "a good advice", kind: "grammar", d: 8 },
+  { w: "ended successfully", ph: "/səkˈses.fəl.i/", pos: "adverb", def: "In a way that achieves the intended result.", ex: "The meeting ended successfully.", from: "ended successful", kind: "grammar", d: 8 },
+  { w: "tackle", ph: "/ˈtæk.əl/", pos: "verb", def: "To make a determined effort to deal with a difficult task.", ex: "I had many plans to tackle at home.", from: "to do", kind: "vocabulary", d: 11 },
+  { w: "lunchtime", ph: "/ˈlʌntʃ.taɪm/", pos: "noun", def: "The period in the middle of the day when people usually eat lunch.", ex: "We talked over lunchtime.", from: "the lunch time", kind: "style", d: 13 },
+  { w: "suggested that I learn", ph: "/səˈdʒes.tɪd/", pos: "verb pattern", def: "To propose an idea — followed by a that-clause, never “someone to do”.", ex: "He suggested that I learn programming.", from: "suggested me to learn", kind: "grammar", d: 17 },
+  { w: "terrible", ph: "/ˈter.ə.bəl/", pos: "adjective", def: "Very bad or unpleasant; much stronger than “bad”.", ex: "I felt terrible about myself.", from: "very bad", kind: "vocabulary", d: 21 },
+  { w: "instead", ph: "/ɪnˈsted/", pos: "adverb", def: "In place of something else that was expected.", ex: "I played games instead.", from: "finally I went to play", kind: "style", d: 26 },
+  { w: "opted to", ph: "/ˈɒp.tɪd/", pos: "verb", def: "To choose one thing rather than another.", ex: "I opted to stay home.", from: "went to", kind: "vocabulary", d: 34 },
+  { w: "skills are", ph: "/skɪlz/", pos: "noun (plural)", def: "Abilities gained through training or practice.", ex: "My English skills are improving.", from: "skill is", kind: "grammar", d: 41 },
+  { w: "a better day", ph: "/ˈbet.ər/", pos: "adjective (comparative)", def: "Already comparative, so never used with “more”.", ex: "I hope tomorrow is a better day.", from: "a more better day", kind: "grammar", d: 52 },
+];
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const TODAY = new Date(2026, 7, 1);
+const START = new Date(2025, 8, 1);
+const dow = (d) => (d.getDay() + 6) % 7; // Monday-first
+const kk = (d) => d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+const hsh = (d) => (((d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()) * 2654435761) % 1000) / 1000;
+
+function entryFor(d) {
+  if (d > TODAY || d < START) return null;
+  const h = hsh(d);
+  if (h > 0.62) return null;
+  return { backfilled: h > 0.5, words: 120 + Math.round(h * 900), mood: h < 0.22 ? "happy" : h < 0.46 ? "normal" : "sad" };
+}
+
+class Component extends DCLogic {
+  state = { theme: "light", screen: "home", width: "desktop", view: "year", year: 2026, month: 6,
+            sug: "done", sel: null, text: ENTRY, mood: 1, copied: false,
+            pop: null, vocab: [4, 10], vocabOpen: true, spoke: null,
+            q: "", range: "all", kind: "all", sort: "new",
+            mastered: ["delicious", "lunchtime", "instead", "terrible"] };
+
+  say(word) {
+    this.setState({ spoke: word });
+    setTimeout(() => this.setState({ spoke: null }), 1100);
+    try {
+      const u = new SpeechSynthesisUtterance(word);
+      u.lang = "en-US"; u.rate = 0.92;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  cell(d, big) {
+    const future = d > TODAY;
+    const today = kk(d) === kk(TODAY);
+    const e = future ? null : entryFor(d);
+    const bg = future ? "var(--future)"
+      : e ? (e.backfilled ? "repeating-linear-gradient(135deg,var(--leaf) 0 3px,var(--leaf-deep) 3px 6px)" : "var(--leaf)")
+      : "var(--empty)";
+    const onLeaf = !!e;
+    return {
+      bg,
+      border: future ? "1px dashed var(--line-2)" : "1px solid transparent",
+      ring: today ? "0 0 0 2px var(--brass)" : "none",
+      cursor: future ? "default" : "pointer",
+      opacity: future ? 0.6 : 1,
+      day: d.getDate(),
+      fg: onLeaf ? "#f3f7f3" : "var(--ink-2)",
+      metaFg: onLeaf ? "rgba(243,247,243,.8)" : "var(--ink-3)",
+      meta: e ? e.words + "w" : future ? "" : "—",
+      moodBg: e ? (e.mood === "happy" ? "var(--brass)" : e.mood === "normal" ? "#f3f7f3" : "transparent") : "transparent",
+      moodBorder: e && e.mood === "sad" ? "1.4px solid rgba(243,247,243,.85)" : "0",
+      tip: SHORT[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear() +
+        (e ? " · " + e.words + " words · " + e.mood + (e.backfilled ? " · backfilled" : " · on time") : future ? " · upcoming" : " · no entry"),
+    };
+  }
+
+  seg(active) {
+    return { bg: active ? "var(--card)" : "transparent", fg: active ? "var(--ink)" : "var(--ink-3)", sh: active ? "var(--shadow-1)" : "none" };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const mob = s.width === "mobile";
+    const isYearView = s.view === "year";
+
+    // ---- year grid, Monday-first ----
+    const jan = new Date(s.year, 0, 1);
+    const gs = new Date(s.year, 0, 1 - dow(jan));
+    const dec = new Date(s.year, 11, 31);
+    const ge = new Date(s.year, 11, 31 + (6 - dow(dec)));
+    const yearCells = [], monthTicks = [];
+    let seen = -1;
+    for (const d = new Date(gs); d <= ge; d.setDate(d.getDate() + 1)) {
+      const inY = d.getFullYear() === s.year;
+      yearCells.push(inY ? this.cell(new Date(d)) : { bg: "transparent", border: "1px solid transparent", ring: "none", cursor: "default", tip: "" });
+      if (inY && d.getMonth() !== seen && dow(d) <= 3) {
+        seen = d.getMonth();
+        monthTicks.push({ text: SHORT[seen], col: Math.floor(yearCells.length / 7) + 1 });
+      }
+    }
+
+    // ---- month grid ----
+    const first = new Date(s.year, s.month, 1);
+    const ms = new Date(s.year, s.month, 1 - dow(first));
+    const last = new Date(s.year, s.month + 1, 0);
+    const me = new Date(s.year, s.month, last.getDate() + (6 - dow(last)));
+    const monthCells = [];
+    for (const d = new Date(ms); d <= me; d.setDate(d.getDate() + 1)) {
+      monthCells.push(d.getMonth() === s.month ? this.cell(new Date(d), true)
+        : { bg: "transparent", border: "1px solid transparent", ring: "none", cursor: "default", opacity: 1, day: "", meta: "", fg: "var(--ink-3)", metaFg: "var(--ink-3)", moodBg: "transparent", moodBorder: "0", tip: "" });
+    }
+
+    let entries = 0;
+    for (const d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) if (entryFor(d)) entries++;
+
+    // ---- streak beads ----
+    const streakBeads = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(TODAY); d.setDate(d.getDate() - i);
+      const e = entryFor(d);
+      streakBeads.push({
+        bg: e ? (e.backfilled ? "repeating-linear-gradient(135deg,var(--leaf) 0 3px,var(--leaf-deep) 3px 6px)" : "var(--leaf)") : "var(--empty)",
+        ring: i === 0 ? "0 0 0 1.5px var(--brass)" : "none",
+        tip: SHORT[d.getMonth()] + " " + d.getDate(),
+      });
+    }
+
+    // ---- suggestion tokens ----
+    // pair each highlight with the text that follows it, so no stray
+    // whitespace can appear between a corrected word and its punctuation
+    const tokens = [];
+    STREAM.forEach((piece) => {
+      if (typeof piece === "string") {
+        if (tokens.length && tokens[tokens.length - 1].tail === "") tokens[tokens.length - 1].tail = piece;
+        else tokens.push({ mark: "", tail: piece, bg: "transparent", ring: "none", cursor: "text", title: "", select: null });
+        return;
+      }
+      const c = CHANGES[piece];
+      const on = s.sel === piece;
+      const saved = s.vocab.indexOf(piece) >= 0;
+      const bg = on ? "var(--brass-soft)" : "var(--leaf-soft)";
+      tokens.push({
+        mark: c.to, tail: "", bg,
+        ring: "0 0 0 2px " + bg + (on ? ", 0 0 0 3.5px var(--brass)" : ""),
+        deco: saved ? "underline" : "none",
+        cursor: "pointer",
+        title: c.from + " → " + c.to + " · " + c.kind,
+        // measure against the panel's non-scrolling layer so the popover can be
+        // clamped inside it — an absolute popover inside the scroll box clips
+        select: (e) => {
+          if (s.pop === piece) return this.setState({ sel: null, pop: null });
+          const el = e.currentTarget;
+          const card = el.closest("[data-pop-layer]");
+          let x = 12, y = 12;
+          if (card) {
+            const a = el.getBoundingClientRect(), b = card.getBoundingClientRect();
+            const W = 236, H = 44, pad = 10;
+            x = Math.max(pad, Math.min(a.left - b.left, b.width - W - pad));
+            y = a.bottom - b.top + 8;
+            if (y + H > b.height - pad) y = Math.max(pad, a.top - b.top - H - 8);
+          }
+          this.setState({ sel: piece, pop: piece, popX: x + "px", popY: y + "px" });
+        },
+        soundLabel: s.spoke === c.to ? "Playing…" : "Sound",
+        soundFg: s.spoke === c.to ? "var(--leaf)" : "var(--ink-2)",
+        doCopy: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600); },
+        doSound: () => this.say(c.to),
+        doNote: () => this.setState({
+          vocab: saved ? s.vocab.filter((x) => x !== piece) : s.vocab.concat([piece]),
+          pop: null, vocabOpen: true,
+        }),
+        noteLabel: saved ? "In vocabulary ✓" : "Note to vocabulary",
+        noteBg: saved ? "var(--brass-soft)" : "transparent",
+        noteFg: saved ? "var(--brass)" : "var(--ink-2)",
+        saved,
+      });
+    });
+
+    const vocab = s.vocab.map((i) => {
+      const c = CHANGES[i], g = gloss(c.to);
+      return {
+        word: c.to, phon: g.phon, pos: g.pos, def: g.def, ex: g.ex,
+        from: c.from, kind: c.kind,
+        chipBg: CHIPS[c.kind].bg, chipFg: CHIPS[c.kind].fg,
+        speaking: s.spoke === c.to,
+        say: () => this.say(c.to),
+        remove: () => this.setState({ vocab: s.vocab.filter((x) => x !== i) }),
+      };
+    });
+    // paragraph breaks are structural (<p>), never white-space:pre-wrap
+    const paras = [{ tokens: [] }];
+    tokens.forEach((tk) => {
+      const parts = tk.tail.split("\n\n");
+      paras[paras.length - 1].tokens.push({ ...tk, tail: parts[0] });
+      for (let i = 1; i < parts.length; i++) {
+        paras.push({ tokens: [{ mark: "", tail: parts[i], bg: "transparent", ring: "none", cursor: "text", title: "", select: null }] });
+      }
+    });
+
+    const changes = CHANGES.map((c, i) => {
+      const on = s.sel === i;
+      return {
+        from: c.from, to: c.to, kind: c.kind, why: c.why,
+        bg: on ? "var(--brass-soft)" : "var(--card)",
+        border: on ? "var(--brass)" : "var(--line)",
+        shadow: on ? "var(--shadow-2)" : "var(--shadow-1)",
+        stripe: on ? "var(--brass)" : "transparent",
+        chipBg: CHIPS[c.kind].bg, chipFg: CHIPS[c.kind].fg,
+        select: () => this.setState({ sel: on ? null : i, pop: null }),
+        saved: s.vocab.indexOf(i) >= 0,
+        noteLabel: s.vocab.indexOf(i) >= 0 ? "Saved ✓" : "+ Vocabulary",
+        noteBg: s.vocab.indexOf(i) >= 0 ? "var(--brass-soft)" : "transparent",
+        noteFg: s.vocab.indexOf(i) >= 0 ? "var(--brass)" : "var(--ink-3)",
+        noteBorder: s.vocab.indexOf(i) >= 0 ? "var(--brass)" : "var(--line-2)",
+        note: () => this.setState({
+          vocab: s.vocab.indexOf(i) >= 0 ? s.vocab.filter((x) => x !== i) : s.vocab.concat([i]),
+          vocabOpen: true,
+        }),
+        say: () => this.say(c.to),
+      };
+    });
+
+    const moods = [
+      { key: "happy", glyph: "☀", label: "happy" },
+      { key: "normal", glyph: "◐", label: "normal" },
+      { key: "sad", glyph: "☂", label: "sad" },
+    ].map((m, i) => {
+      const on = s.mood === i;
+      return { glyph: m.glyph, label: m.label,
+        bg: on ? "var(--brass-soft)" : "transparent",
+        border: on ? "1.5px solid var(--brass)" : "1.5px solid var(--line-2)",
+        fg: on ? "var(--ink)" : "var(--ink-3)",
+        scale: on ? "scale(1.06)" : "none",
+        pick: () => this.setState({ mood: i }) };
+    });
+
+    // ── library ───────────────────────────────────────────────
+    const DAY = 86400000;
+    const dayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const libAll = LIBRARY.map((v) => {
+      const dt = new Date(TODAY.getTime() - v.d * DAY);
+      return { ...v, dt };
+    });
+    const rangeDays = { all: 9999, "7": 7, "30": 30, "365": 365 }[s.range] ?? 9999;
+    let lib = libAll.filter((v) => v.d < rangeDays);
+    if (s.kind !== "all") lib = lib.filter((v) => v.kind === s.kind);
+    const q = s.q.trim().toLowerCase();
+    if (q) lib = lib.filter((v) => (v.w + " " + v.def + " " + v.from).toLowerCase().indexOf(q) >= 0);
+    lib = lib.slice().sort((a, b) => s.sort === "az" ? a.w.localeCompare(b.w) : a.d - b.d);
+
+    const shape = (v) => {
+      const done = s.mastered.indexOf(v.w) >= 0;
+      return {
+        word: v.w, phon: v.ph, pos: v.pos, def: v.def, ex: v.ex, from: v.from, kind: v.kind,
+        chipBg: CHIPS[v.kind].bg, chipFg: CHIPS[v.kind].fg,
+        when: SHORT[v.dt.getMonth()] + " " + v.dt.getDate(),
+        say: () => this.say(v.w),
+        soundFg: s.spoke === v.w ? "var(--leaf)" : "var(--ink-3)",
+        done,
+        starGlyph: done ? "★" : "☆",
+        starFg: done ? "var(--brass)" : "var(--ink-3)",
+        starBg: done ? "var(--brass-soft)" : "transparent",
+        starBorder: done ? "var(--brass)" : "var(--line-2)",
+        starLabel: done ? "Known" : "Learning",
+        toggle: () => this.setState({ mastered: done ? s.mastered.filter((x) => x !== v.w) : s.mastered.concat([v.w]) }),
+        cardBorder: done ? "var(--brass)" : "var(--line)",
+      };
+    };
+
+    const libGroups = [];
+    if (s.sort === "az") {
+      libGroups.push({ label: "All words, A – Z", count: lib.length + " words", items: lib.map(shape) });
+    } else {
+      lib.forEach((v) => {
+        const label = v.d === 0 ? "Today" : v.d === 1 ? "Yesterday"
+          : dayName[v.dt.getDay()] + ", " + SHORT[v.dt.getMonth()] + " " + v.dt.getDate();
+        const g = libGroups[libGroups.length - 1];
+        if (g && g.label === label) g.items.push(shape(v));
+        else libGroups.push({ label, count: "", items: [shape(v)] });
+      });
+      libGroups.forEach((g) => { g.count = g.items.length + (g.items.length === 1 ? " word" : " words"); });
+    }
+
+    const chip = (on) => ({
+      bg: on ? "var(--ink)" : "transparent",
+      fg: on ? "var(--paper)" : "var(--ink-2)",
+      border: on ? "var(--ink)" : "var(--line-2)",
+    });
+    const rangeChips = [["all","All time"],["365","This year"],["30","Last 30 days"],["7","Last 7 days"]].map(([k, label]) => {
+      const a = chip(s.range === k);
+      return { label, bg: a.bg, fg: a.fg, border: a.border, go: () => this.setState({ range: k }) };
+    });
+    const kindChips = [["all","All kinds"],["vocabulary","Vocabulary"],["grammar","Grammar"],["style","Style"],["spelling","Spelling"]].map(([k, label]) => {
+      const a = chip(s.kind === k);
+      return { label, bg: a.bg, fg: a.fg, border: a.border, go: () => this.setState({ kind: k }) };
+    });
+    const sortNew = this.seg(s.sort === "new"), sortAz = this.seg(s.sort === "az");
+
+    const t = this.state.text.trim();
+    const screenTabs = [["home","Home"],["entry","Entry"],["suggest","Suggestion"],["library","Library"],["tokens","Tokens"]].map(([k, label]) => {
+      const a = this.seg(s.screen === k);
+      return { label, bg: a.bg, fg: a.fg, sh: a.sh, go: () => this.setState({ screen: k }) };
+    });
+    const stateTabs = [["idle","Idle"],["loading","Loading"],["error","Error"],["done","Notes"]].map(([k, label]) => {
+      const a = this.seg(s.sug === k);
+      return { label, bg: a.bg, fg: a.fg, sh: a.sh, go: () => this.setState({ sug: k }) };
+    });
+
+    const y = this.seg(isYearView), m = this.seg(!isYearView);
+    const dsk = this.seg(!mob), mbl = this.seg(mob);
+
+    return {
+      theme: s.theme, themeLabel: s.theme === "light" ? "☾ Dark" : "☀ Light",
+      toggleTheme: () => this.setState({ theme: s.theme === "light" ? "dark" : "light" }),
+      screenTabs, stateTabs,
+      setDesktop: () => this.setState({ width: "desktop" }), setMobile: () => this.setState({ width: "mobile" }),
+      deskBg: dsk.bg, deskFg: dsk.fg, deskSh: dsk.sh, mobBg: mbl.bg, mobFg: mbl.fg, mobSh: mbl.sh,
+
+      isHome: s.screen === "home", isEntry: s.screen === "entry", isSuggest: s.screen === "suggest",
+      isTokens: s.screen === "tokens", isLibrary: s.screen === "library",
+      goLibrary: () => this.setState({ screen: "library" }),
+      libGroups, libCount: lib.length, libEmpty: lib.length === 0, libHas: lib.length > 0,
+      libTotal: LIBRARY.length,
+      libWeek: LIBRARY.filter((v) => v.d < 7).length,
+      libKnown: s.mastered.length,
+      libStreakNote: LIBRARY.filter((v) => v.d < 30).length + " added in the last 30 days",
+      rangeChips, kindChips,
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value }),
+      clearQ: () => this.setState({ q: "", range: "all", kind: "all" }),
+      sortNewBg: sortNew.bg, sortNewFg: sortNew.fg, sortNewSh: sortNew.sh,
+      sortAzBg: sortAz.bg, sortAzFg: sortAz.fg, sortAzSh: sortAz.sh,
+      setSortNew: () => this.setState({ sort: "new" }), setSortAz: () => this.setState({ sort: "az" }),
+      libCols: mob ? "1fr" : "repeat(auto-fill,minmax(316px,1fr))",
+      onSuggest: s.screen === "suggest",
+      goHome: () => this.setState({ screen: "home" }), goEntry: () => this.setState({ screen: "entry" }),
+      goSuggest: () => this.setState({ screen: "suggest", sug: "done" }),
+
+      frameMax: mob ? "412px" : "1500px",
+      framePad: mob ? "22px 18px 60px" : "34px 40px 72px",
+      frameEdge: mob ? "1px solid var(--line)" : "0",
+      h1Size: mob ? "24px" : "31px",
+      statCols: mob ? "1fr 1fr" : "repeat(4,1fr)",
+      statPad: mob ? "16px 16px" : "20px 24px",
+      statBig: mob ? "34px" : "44px",
+      cardPad: mob ? "18px 16px" : "24px 26px",
+      calGap: mob ? "5px" : "9px",
+      calRatio: mob ? "1" : "1.25",
+      calCellPad: mob ? "6px" : "9px",
+      calDaySize: mob ? "12px" : "14px",
+      heatMin: mob ? "720px" : "0",
+      entryCols: mob ? "1fr" : "minmax(0,250px) minmax(0,1fr) minmax(0,250px)",
+      entryGap: mob ? "16px" : "clamp(14px,2.4vw,32px)",
+      suggestCols: mob ? "1fr" : "1fr 1fr",
+      noteCols: mob ? "1fr" : "1fr 1fr",
+      tokenCols: mob ? "1fr" : "1fr 1fr",
+      colH: mob ? "440px" : "600px",
+      paperH: mob ? "460px" : "620px",
+      bodySize: mob ? "16.5px" : "17.5px",
+      textPad: mob ? "26px" : "44px",
+      ruleX: mob ? "20px" : "30px",
+      wideRail: !mob, narrowRail: mob,
+
+      todayLong: "SATURDAY, AUGUST 1, 2026",
+      isYearView, isMonthView: !isYearView, year: s.year, monthLabel: MONTHS[s.month] + " " + s.year,
+      rangeTitle: isYearView ? s.year + " in full" : MONTHS[s.month] + " " + s.year,
+      rangeSub: isYearView ? "each square is a day — hover for details" : last.getDate() + " days · " + entries + " entries",
+      yBg: y.bg, yFg: y.fg, ySh: y.sh, mBg: m.bg, mFg: m.fg, mSh: m.sh,
+      setYear: () => this.setState({ view: "year" }), setMonth: () => this.setState({ view: "month" }),
+      prev: () => this.setState(isYearView ? { year: s.year - 1 } : (s.month === 0 ? { month: 11, year: s.year - 1 } : { month: s.month - 1 })),
+      next: () => this.setState(isYearView ? { year: Math.min(s.year + 1, TODAY.getFullYear()) } : (s.month === 11 ? { month: 0, year: s.year + 1 } : { month: s.month + 1 })),
+      yearCells, monthTicks, monthCells, weekCount: Math.ceil(yearCells.length / 7), streakBeads,
+
+      text: s.text, isBlank: t.length === 0,
+      wordCount: t ? t.split(/\s+/).length : 0,
+      onEdit: (e) => this.setState({ text: e.target.value }),
+      moods,
+      prompts: [
+        { text: "What surprised me today", use: () => this.setState({ text: "What surprised me today was " }) },
+        { text: "One person I talked to", use: () => this.setState({ text: "Today I talked to " }) },
+        { text: "Something I want to fix", use: () => this.setState({ text: "One thing I want to fix is " }) },
+      ],
+
+      isIdle: s.sug === "idle", isLoading: s.sug === "loading", isError: s.sug === "error", isDone: s.sug === "done",
+      runLoading: () => { this.setState({ sug: "loading" }); setTimeout(() => this.setState({ sug: "done" }), 2200); },
+      skeleton: ["96%","88%","74%","92%","60%","84%","90%","70%","46%"].map((w, i) => ({ w, d: (i * 0.12).toFixed(2) + "s" })),
+      paras, changes, changeCount: CHANGES.length, feedback: FEEDBACK,
+      vocab, vocabCount: vocab.length, hasVocab: vocab.length > 0,
+      vocabOpen: s.vocabOpen && vocab.length > 0,
+      vocabToggle: s.vocabOpen ? "Hide" : "Show",
+      toggleVocab: () => this.setState({ vocabOpen: !s.vocabOpen }),
+      vocabCols: mob ? "1fr" : "repeat(auto-fill,minmax(300px,1fr))",
+      pop: s.pop !== null && s.sug === "done",
+      popX: s.popX || "12px", popY: s.popY || "12px",
+      // the popover lives in the panel's non-scrolling layer, so scrolling the
+      // tutor's copy would detach it from its word — dismiss instead
+      closePop: () => { if (s.pop !== null) this.setState({ pop: null }); },
+      popCopy: () => { this.setState({ copied: true, pop: null }); setTimeout(() => this.setState({ copied: false }), 1600); },
+      popSound: () => { if (s.pop !== null) this.say(CHANGES[s.pop].to); },
+      popSoundFg: s.pop !== null && s.spoke === CHANGES[s.pop].to ? "var(--leaf)" : "var(--ink-2)",
+      popNote: () => this.setState({
+        vocab: s.vocab.indexOf(s.pop) >= 0 ? s.vocab.filter((x) => x !== s.pop) : s.vocab.concat([s.pop]),
+        pop: null, vocabOpen: true,
+      }),
+      popNoteLabel: s.vocab.indexOf(s.pop) >= 0 ? "Saved ✓" : "Vocabulary",
+      popNoteBg: s.vocab.indexOf(s.pop) >= 0 ? "var(--brass-soft)" : "transparent",
+      popNoteFg: s.vocab.indexOf(s.pop) >= 0 ? "var(--brass)" : "var(--ink-2)",
+      copyLabel: s.copied ? "Copied ✓" : "Copy",
+      copy: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600); },
+
+      colorTokens: [
+        { name: "--paper", light: "#F6F1E7", dark: "#171614", swatch: "var(--paper)" },
+        { name: "--paper-2", light: "#EFE8DA", dark: "#1D1C19", swatch: "var(--paper-2)" },
+        { name: "--card", light: "#FFFDF8", dark: "#211F1C", swatch: "var(--card)" },
+        { name: "--ink", light: "#23201C", dark: "#ECE7DC", swatch: "var(--ink)" },
+        { name: "--ink-2", light: "#5A5346", dark: "#B3AB9C", swatch: "var(--ink-2)" },
+        { name: "--ink-3", light: "#8A7F6D", dark: "#847C6D", swatch: "var(--ink-3)" },
+        { name: "--wax", light: "#9C3B2C", dark: "#D4694F", swatch: "var(--wax)" },
+        { name: "--leaf", light: "#4F7B58", dark: "#6F9E78", swatch: "var(--leaf)" },
+        { name: "--leaf-deep", light: "#2F4A37", dark: "#3D5C45", swatch: "var(--leaf-deep)" },
+        { name: "--brass", light: "#C9A227", dark: "#D9B452", swatch: "var(--brass)" },
+        { name: "--empty", light: "#E4DCCC", dark: "#2C2925", swatch: "var(--empty)" },
+        { name: "--line", light: "ink @ 11%", dark: "paper @ 10%", swatch: "var(--line)" },
+      ],
+      typeTokens: [
+        { label: "Display 31/1.1", family: "Literata,serif", size: "31px", spec: "Literata 500 · -.02em" },
+        { label: "Heading 20/1.25", family: "Literata,serif", size: "20px", spec: "Literata 500 · -.01em" },
+        { label: "Reading 17.5/1.78", family: "Literata,serif", size: "17.5px", spec: "Literata 400" },
+        { label: "Note 15/1.55", family: "Literata,serif", size: "15px", spec: "Literata 400 italic" },
+        { label: "UI 14/1.4", family: "'Instrument Sans',sans-serif", size: "14px", spec: "Instrument 400–500" },
+        { label: "Meta 12.5/1.5", family: "'Instrument Sans',sans-serif", size: "12.5px", spec: "Instrument 400" },
+        { label: "LABEL 10.5", family: "'Instrument Sans',sans-serif", size: "10.5px", spec: "500 · .15em caps" },
+        { label: "42,180", family: "'Space Grotesk',monospace", size: "22px", spec: "Space Grotesk 700 · numerals" },
+      ],
+      spaceTokens: [4,8,12,16,20,26,34].map((n) => ({ px: n + "px" })),
+      motionTokens: [
+        { name: "Hover / control", spec: "160ms · cubic-bezier(.2,.7,.3,1)" },
+        { name: "Cell + photo lift", spec: "140–320ms · same easing" },
+        { name: "Screen enter", spec: "320ms riseIn (8px)" },
+        { name: "Suggestion unroll", spec: "420ms unroll (16px, .4deg)" },
+        { name: "Loading nib sweep", spec: "1.6s linear · infinite" },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

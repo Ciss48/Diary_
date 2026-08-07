@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import type { SavedVocabItem } from '@/lib/vocab'
+import { getViCardState } from '@/lib/vocab'
 
 const TYPE_CHIPS: Record<string, { bg: string; fg: string }> = {
   grammar:    { bg: 'var(--wax-soft)',   fg: 'var(--wax)' },
@@ -15,10 +16,13 @@ interface Props {
   items: SavedVocabItem[]
   onRemove: (id: string) => void
   onRetryLookup: (headword: string, pos: string) => void
+  onFetchVietnamese: (id: string) => Promise<{ meaning: string; explanation: string } | null>
 }
 
-export default function VocabPanel({ items, onRemove, onRetryLookup }: Props) {
+export default function VocabPanel({ items, onRemove, onRetryLookup, onFetchVietnamese }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const [viLoading, setViLoading] = useState<Set<string>>(new Set())
+  const [viFailed, setViFailed] = useState<Set<string>>(new Set())
 
   const handleSpeak = useCallback((text: string) => {
     if (!window.speechSynthesis) return
@@ -30,6 +34,16 @@ export default function VocabPanel({ items, onRemove, onRetryLookup }: Props) {
     utterance.rate = 0.9
     window.speechSynthesis.speak(utterance)
   }, [])
+
+  const handleFetchVi = useCallback(async (id: string) => {
+    setViLoading(prev => new Set(prev).add(id))
+    setViFailed(prev => { const s = new Set(prev); s.delete(id); return s })
+    const result = await onFetchVietnamese(id)
+    setViLoading(prev => { const s = new Set(prev); s.delete(id); return s })
+    if (!result || (!result.meaning && !result.explanation)) {
+      setViFailed(prev => new Set(prev).add(id))
+    }
+  }, [onFetchVietnamese])
 
   if (items.length === 0) return null
 
@@ -74,6 +88,9 @@ export default function VocabPanel({ items, onRemove, onRetryLookup }: Props) {
               onRemove={() => onRemove(item.id)}
               onSpeak={() => handleSpeak(item.display_form)}
               onRetry={() => onRetryLookup(item.headword, item.definition?.part_of_speech ?? '')}
+              onFetchVi={() => handleFetchVi(item.id)}
+              viLoading={viLoading.has(item.id)}
+              viFailed={viFailed.has(item.id)}
             />
           ))}
         </div>
@@ -87,16 +104,23 @@ function VocabCard({
   onRemove,
   onSpeak,
   onRetry,
+  onFetchVi,
+  viLoading,
+  viFailed,
 }: {
   item: SavedVocabItem
   onRemove: () => void
   onSpeak: () => void
   onRetry: () => void
+  onFetchVi: () => void
+  viLoading: boolean
+  viFailed: boolean
 }) {
   const def = item.definition
   const chip = item.change_type ? TYPE_CHIPS[item.change_type] : null
   const isLoading = !def
   const hasDef = def && def.definition
+  const viState = getViCardState(item)
 
   // Check for English voice availability
   const hasVoice = typeof window !== 'undefined' &&
@@ -174,6 +198,17 @@ function VocabCard({
         </>
       )}
 
+      {/* Vietnamese section */}
+      <VietnameseSection
+        viState={viState}
+        viMeaning={item.vi_meaning}
+        viExplanation={item.vi_explanation}
+        originalForm={item.original_form}
+        viLoading={viLoading}
+        viFailed={viFailed}
+        onFetchVi={onFetchVi}
+      />
+
       {/* Footer: change type + "you wrote" */}
       <div className="flex items-center gap-2 mt-[3px] pt-[9px] border-t border-line">
         {chip && (
@@ -190,6 +225,75 @@ function VocabCard({
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+function VietnameseSection({
+  viState,
+  viMeaning,
+  viExplanation,
+  originalForm,
+  viLoading,
+  viFailed,
+  onFetchVi,
+}: {
+  viState: 'has-both' | 'has-meaning-only' | 'not-cached'
+  viMeaning?: string
+  viExplanation?: string
+  originalForm: string
+  viLoading: boolean
+  viFailed: boolean
+  onFetchVi: () => void
+}) {
+  // Show Vietnamese content
+  if (viState === 'has-both' || viState === 'has-meaning-only') {
+    return (
+      <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+        <p className="m-0 text-[13px] leading-[1.55] text-ink font-medium">
+          {viMeaning}
+        </p>
+        {viState === 'has-both' && viExplanation && (
+          <p className="m-0 mt-1 text-[12.5px] leading-[1.55] text-ink-2 md:line-clamp-none line-clamp-3">
+            {viExplanation}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  // Loading state
+  if (viLoading) {
+    return (
+      <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+        <span className="text-[12.5px] text-ink-3 italic">Đang tải…</span>
+      </div>
+    )
+  }
+
+  // Failed state
+  if (viFailed) {
+    return (
+      <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+        <button
+          onClick={onFetchVi}
+          className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-wax hover:underline p-0"
+        >
+          Không tải được — thử lại
+        </button>
+      </div>
+    )
+  }
+
+  // Not cached — show fetch affordance
+  return (
+    <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+      <button
+        onClick={onFetchVi}
+        className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-brass hover:underline p-0"
+      >
+        Xem tiếng Việt
+      </button>
     </div>
   )
 }

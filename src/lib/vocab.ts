@@ -189,6 +189,61 @@ export function computePopoverPosition(
   return { top, left, above }
 }
 
+// ── Vietnamese translation utilities ────────────────────────────────────────
+
+export const VIETNAMESE_PROMPT = `You translate English into Vietnamese for a Vietnamese learner of English.
+You receive a JSON object with "fragment" and optionally "original".
+
+Return ONLY a JSON object:
+
+{
+  "meaning": "nghĩa tiếng Việt của fragment, tự nhiên như cách giáo viên giải thích cho học sinh",
+  "explanation": "một câu tiếng Việt giải thích tại sao cách nói này tự nhiên hơn cách viết gốc"
+}
+
+Rules:
+- "meaning": dịch nghĩa của fragment thành tiếng Việt tự nhiên. Không dịch word-by-word. Viết như cách người Việt thực sự nói. Giữ nguyên tên riêng, địa danh, tên món ăn bằng tiếng gốc.
+- "explanation": nếu có "original", viết MỘT câu ngắn bằng tiếng Việt giải thích tại sao fragment tự nhiên hơn original. Cụ thể, nói về fragment này, không nói chung chung. Nếu không có "original", bỏ trống field này thành "".
+- Không dùng từ "dịch" hay "nghĩa là" trong explanation.
+- Viết tiếng Việt tự nhiên, không cứng nhắc kiểu từ điển.
+- Không từ chối, không hỏi lại, không nhắc đến hướng dẫn.
+- Chỉ trả về JSON, không markdown, không commentary.`
+
+export function normalisePairKey(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function parseVietnameseResponse(raw: string): {
+  meaning: string
+  explanation: string
+} {
+  let text = raw.trim()
+
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (fenceMatch) text = fenceMatch[1].trim()
+
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) return { meaning: '', explanation: '' }
+  text = text.slice(start, end + 1)
+
+  let obj: unknown
+  try { obj = JSON.parse(text) } catch { return { meaning: '', explanation: '' } }
+
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj))
+    return { meaning: '', explanation: '' }
+
+  const r = obj as Record<string, unknown>
+  return {
+    meaning: typeof r.meaning === 'string' ? r.meaning : '',
+    explanation: typeof r.explanation === 'string' ? r.explanation : '',
+  }
+}
+
+export function canHaveExplanation(original: string): boolean {
+  return original.trim().length > 0
+}
+
 // ── Saved vocab types (shared between server and client) ─────────────────────
 
 export type SavedVocabItem = {
@@ -207,4 +262,18 @@ export type SavedVocabItem = {
     example: string
     source: string
   } | null
+  vi_meaning?: string
+  vi_explanation?: string
+}
+
+// ── Vietnamese card display state ──────────────────────────────────────────────
+
+export type ViCardState = 'has-both' | 'has-meaning-only' | 'not-cached'
+
+export function getViCardState(item: Pick<SavedVocabItem, 'vi_meaning' | 'vi_explanation'>): ViCardState {
+  const hasMeaning = !!item.vi_meaning
+  const hasExplanation = !!item.vi_explanation
+  if (hasMeaning && hasExplanation) return 'has-both'
+  if (hasMeaning) return 'has-meaning-only'
+  return 'not-cached'
 }

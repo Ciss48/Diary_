@@ -9,6 +9,10 @@ interface ProviderError extends Error {
   status?: number;
 }
 
+function countParagraphs(text: string): number {
+  return text.split(/\n\s*\n/).length;
+}
+
 export async function POST(req: NextRequest) {
   // 1. Auth
   const supabase = await createClient();
@@ -111,7 +115,9 @@ export async function POST(req: NextRequest) {
     userContent = content;
   }
 
-  // 8. Call AI provider
+  // 8. Call AI provider + paragraph validation
+  const inputParagraphs = countParagraphs(userContent);
+
   let raw: string;
   try {
     raw = await callAI(systemPrompt, userContent);
@@ -131,13 +137,43 @@ export async function POST(req: NextRequest) {
   }
 
   // 9. Parse — failed parse does NOT count against quota (no INSERT)
-  const payload = parseSuggestion(raw);
+  let payload = parseSuggestion(raw);
   if (!payload) {
     console.error('[/api/suggest] parseSuggestion returned null. Raw:', raw?.slice(0, 200));
     return NextResponse.json(
       { error: 'The AI returned an unexpected format.' },
       { status: 502 },
     );
+  }
+
+  // 9b. Paragraph-count validation — retry once if mismatch
+  const outputParagraphs = countParagraphs(payload.corrected_version);
+  if (outputParagraphs !== inputParagraphs) {
+    console.warn(
+      `[/api/suggest] stage ${stage} paragraph count mismatch: input=${inputParagraphs} output=${outputParagraphs}, retrying`,
+    );
+    try {
+      const retryContent =
+        userContent +
+        `\n\n[IMPORTANT: your output had ${outputParagraphs} paragraphs but the input has ${inputParagraphs}. Rewrite with exactly ${inputParagraphs} paragraphs separated by blank lines. Do not merge or split paragraphs.]`;
+      const retryRaw = await callAI(systemPrompt, retryContent);
+      const retryPayload = parseSuggestion(retryRaw);
+      if (retryPayload) {
+        const retryParagraphs = countParagraphs(retryPayload.corrected_version);
+        if (retryParagraphs === inputParagraphs) {
+          payload = retryPayload;
+        } else {
+          console.warn(
+            `[/api/suggest] stage ${stage} paragraph mismatch persisted after retry: input=${inputParagraphs} retry=${retryParagraphs}`,
+          );
+          // Use retry result anyway — a merged-paragraph rewrite is still useful
+          payload = retryPayload;
+        }
+      }
+    } catch (retryErr) {
+      console.warn('[/api/suggest] paragraph retry failed, using original result:', (retryErr as Error).message);
+      // Keep original payload
+    }
   }
 
   // 10. Persist — only after successful parse

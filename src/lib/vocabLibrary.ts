@@ -106,7 +106,7 @@ export function searchItems(
   if (!q) return items
   return items.filter(item => {
     const haystack = stripAccents(
-      [item.display_form, item.headword, item.definition?.definition ?? '']
+      [item.display_form, item.headword, item.definition?.definition ?? '', item.vi_meaning ?? '']
         .join(' ')
         .toLowerCase()
     )

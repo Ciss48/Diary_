@@ -215,11 +215,12 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
       setSavedVocab(prev => [...prev, saved])
 
       // 2. Trigger async lookup (fire-and-forget, updates definition)
+      const hw = dc.headword ?? fragment
       fetch('/api/vocab/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          headword: dc.headword ?? fragment,
+          headword: hw,
           pos: dc.pos ?? '',
         }),
       }).then(async lookupRes => {
@@ -227,8 +228,32 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
         const { definition } = await lookupRes.json()
         if (definition) {
           setSavedVocab(prev => prev.map(v =>
-            v.headword === (dc.headword ?? fragment) && !v.definition
-              ? { ...v, definition }
+            v.headword === hw && !v.definition
+              ? { ...v, definition, vi_meaning: (definition as { vi_meaning?: string }).vi_meaning || v.vi_meaning || '' }
+              : v
+          ))
+        }
+      }).catch(() => {})
+
+      // 3. Trigger async Vietnamese fetch (fire-and-forget)
+      fetch('/api/vocab/vietnamese', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fragment,
+          original: dc.original,
+        }),
+      }).then(async viRes => {
+        if (!viRes.ok) return
+        const viData = await viRes.json()
+        if (viData.meaning || viData.explanation) {
+          setSavedVocab(prev => prev.map(v =>
+            v.headword === hw
+              ? {
+                  ...v,
+                  vi_meaning: viData.meaning || v.vi_meaning || '',
+                  vi_explanation: viData.explanation || v.vi_explanation || '',
+                }
               : v
           ))
         }
@@ -283,6 +308,34 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
       // silently fail
     }
   }, [])
+
+  const handleFetchVietnamese = useCallback(async (id: string) => {
+    const item = savedVocab.find(v => v.id === id)
+    if (!item) return
+
+    try {
+      const res = await fetch('/api/vocab/vietnamese', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fragment: item.display_form,
+          original: item.original_form,
+        }),
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      if (data.meaning || data.explanation) {
+        setSavedVocab(prev => prev.map(v =>
+          v.id === id
+            ? { ...v, vi_meaning: data.meaning || '', vi_explanation: data.explanation || '' }
+            : v
+        ))
+      }
+      return data
+    } catch {
+      return null
+    }
+  }, [savedVocab])
 
   // ── Suggestion fetch ─────────────────────────────────────────────────────
   const handleRequestStage = useCallback(async (stage: 1 | 2) => {
@@ -386,6 +439,7 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
               items={savedVocab}
               onRemove={handleVocabPanelRemove}
               onRetryLookup={handleRetryLookup}
+              onFetchVietnamese={handleFetchVietnamese}
             />
           )}
 
@@ -468,6 +522,7 @@ export default function DiaryEditor({ date, timezone, initialStage1, initialStag
                 savedChangeIndices={savedChangeIndices}
                 onVocabSave={handleVocabSave}
                 onVocabRemove={handleVocabRemove}
+                diffChanges={diffChanges}
               />
             </div>
           ) : (

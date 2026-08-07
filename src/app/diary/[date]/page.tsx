@@ -5,6 +5,7 @@ import DiaryEditor from '@/components/DiaryEditor'
 import { filterChanges } from '@/lib/suggestions'
 import type { StoredSuggestion } from '@/lib/suggestions'
 import type { SavedVocabItem } from '@/lib/vocab'
+import { normalisePairKey } from '@/lib/vocab'
 
 interface Props {
   params: Promise<{ date: string }>
@@ -110,24 +111,59 @@ export default async function DiaryPage({ params }: Props) {
       .from('saved_vocab')
       .select(`
         id, display_form, original_form, headword, change_type, status, created_at,
-        vocab_definitions ( id, ipa, part_of_speech, definition, example, source )
+        vocab_definitions ( id, ipa, part_of_speech, definition, example, source, vi_meaning )
       `)
       .eq('entry_id', entry.id)
       .order('created_at', { ascending: true })
 
     if (vocabRows) {
-      initialSavedVocab = vocabRows.map(row => ({
-        id: row.id,
-        display_form: row.display_form,
-        original_form: row.original_form,
-        headword: row.headword,
-        change_type: row.change_type,
-        status: row.status as 'learning' | 'known',
-        created_at: row.created_at,
-        definition: row.vocab_definitions
-          ? (row.vocab_definitions as unknown as SavedVocabItem['definition'])
-          : null,
-      }))
+      initialSavedVocab = vocabRows.map(row => {
+        const defRaw = row.vocab_definitions as unknown as (SavedVocabItem['definition'] & { vi_meaning?: string }) | null
+        return {
+          id: row.id,
+          display_form: row.display_form,
+          original_form: row.original_form,
+          headword: row.headword,
+          change_type: row.change_type,
+          status: row.status as 'learning' | 'known',
+          created_at: row.created_at,
+          definition: defRaw
+            ? { id: defRaw.id, ipa: defRaw.ipa, part_of_speech: defRaw.part_of_speech, definition: defRaw.definition, example: defRaw.example, source: defRaw.source }
+            : null,
+          vi_meaning: defRaw?.vi_meaning || '',
+        }
+      })
+
+      // Batch-query vi_explanations for items that have an original_form
+      const pairs = initialSavedVocab
+        .filter(item => item.original_form?.trim())
+        .map(item => ({
+          nc: normalisePairKey(item.display_form),
+          no: normalisePairKey(item.original_form),
+        }))
+
+      if (pairs.length > 0) {
+        const { data: explRows } = await supabase
+          .from('vi_explanations')
+          .select('norm_corrected, norm_original, explanation')
+          .or(
+            pairs.map(p =>
+              `and(norm_corrected.eq.${p.nc},norm_original.eq.${p.no})`
+            ).join(',')
+          )
+
+        if (explRows && explRows.length > 0) {
+          const explMap = new Map(
+            explRows.map(r => [`${r.norm_corrected}|${r.norm_original}`, r.explanation])
+          )
+          initialSavedVocab = initialSavedVocab.map(item => {
+            if (!item.original_form?.trim()) return item
+            const key = `${normalisePairKey(item.display_form)}|${normalisePairKey(item.original_form)}`
+            const expl = explMap.get(key)
+            return expl ? { ...item, vi_explanation: expl } : item
+          })
+        }
+      }
     }
   }
 

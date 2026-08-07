@@ -12,9 +12,10 @@ async function callGroq(
   systemPrompt: string,
   userContent: string,
   includeResponseFormat: boolean,
+  modelOverride?: string,
 ): Promise<string> {
   const apiKey = process.env.AI_API_KEY;
-  const model = process.env.AI_MODEL;
+  const model = modelOverride ?? process.env.AI_MODEL;
 
   if (!apiKey || !model) {
     throw new Error('AI_API_KEY or AI_MODEL env var is missing');
@@ -96,6 +97,37 @@ export async function callAI(
         '[ai/provider] response_format not supported by model; retrying without it.',
       );
       return await callGroq(systemPrompt, userContent, false);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Calls the AI provider using the small model (AI_MODEL_SMALL env var).
+ * Falls back to AI_MODEL if AI_MODEL_SMALL is unset.
+ * Same retry-on-400 logic as callAI.
+ */
+export async function callAISmall(
+  systemPrompt: string,
+  userContent: string,
+): Promise<string> {
+  const provider = process.env.AI_PROVIDER;
+
+  if (provider !== 'groq') {
+    throw new Error('Unsupported AI_PROVIDER: ' + (provider ?? '(unset)'));
+  }
+
+  const smallModel = process.env.AI_MODEL_SMALL || process.env.AI_MODEL;
+
+  try {
+    return await callGroq(systemPrompt, userContent, true, smallModel);
+  } catch (err) {
+    const providerErr = err as ProviderError;
+    if (providerErr.status === 400) {
+      console.error(
+        '[ai/provider] response_format not supported by small model; retrying without it.',
+      );
+      return await callGroq(systemPrompt, userContent, false, smallModel);
     }
     throw err;
   }

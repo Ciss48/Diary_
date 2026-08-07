@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from 'react'
 import type { Segment } from '@/lib/suggestions'
+import type { DiffChange } from '@/lib/diff'
 import VocabPopover from '@/components/VocabPopover'
 
 const SCROLLBAR =
@@ -19,6 +20,7 @@ interface Props {
   savedChangeIndices: Set<number>
   onVocabSave: (changeIndex: number, fragment: string) => void
   onVocabRemove: (changeIndex: number) => void
+  diffChanges: DiffChange[]
 }
 
 /** Split segments into paragraphs on "\n\n" boundaries. */
@@ -48,6 +50,7 @@ export default function ImprovedVersionPane({
   savedChangeIndices,
   onVocabSave,
   onVocabRemove,
+  diffChanges,
 }: Props) {
   const [copyLabel, setCopyLabel] = useState<'Copy' | 'Copied ✓' | 'Copy failed'>('Copy')
   const [popover, setPopover] = useState<{ changeIndex: number; rect: DOMRect; text: string } | null>(null)
@@ -211,6 +214,7 @@ export default function ImprovedVersionPane({
         <VocabPopover
           anchorRect={popover.rect}
           fragment={popover.text}
+          originalText={diffChanges[popover.changeIndex]?.original ?? ''}
           isSaved={savedChangeIndices.has(popover.changeIndex)}
           hasEnglishVoice={hasEnglishVoice}
           onCopy={handlePopoverCopy}

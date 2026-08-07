@@ -44,11 +44,11 @@ export default function SuggestionPanel({
           <button
             onClick={onRequestStage2}
             disabled={!canRequestStage2}
-            className="hv-lift border border-ink bg-transparent text-ink cursor-pointer font-sans text-[14px] font-medium
-              px-[22px] py-[13px] rounded-[10px]
+            className="hv-lift border-0 cursor-pointer bg-leaf text-white font-sans text-[14px] font-medium
+              px-[22px] py-[13px] rounded-[10px] shadow-[var(--shadow-1)]
               disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loadingStage === 2 ? 'Improving…' : 'Suggest better English'}
+            {loadingStage === 2 ? 'Improving…' : 'Write It Like a Native'}
           </button>
         )}
 

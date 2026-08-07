@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import type { LibraryVocabItem, TimeRange, KindFilter, SortOrder } from '@/lib/vocabLibrary'
+import { getViCardState } from '@/lib/vocab'
 import {
   filterByRange,
   filterByKind,
@@ -114,6 +115,47 @@ export default function VocabLibrary({ items: initialItems, timezone, today }: P
       }
     } catch { /* silently fail */ }
   }, [])
+
+  // ── Vietnamese on-demand fetch ─────────────────────────────────────────────
+  const [viLoading, setViLoading] = useState<Set<string>>(new Set())
+  const [viFailed, setViFailed] = useState<Set<string>>(new Set())
+
+  const handleFetchVietnamese = useCallback(async (id: string) => {
+    const item = items.find(v => v.id === id)
+    if (!item) return
+
+    setViLoading(prev => new Set(prev).add(id))
+    setViFailed(prev => { const s = new Set(prev); s.delete(id); return s })
+
+    try {
+      const res = await fetch('/api/vocab/vietnamese', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fragment: item.display_form,
+          original: item.original_form,
+        }),
+      })
+      if (!res.ok) {
+        setViFailed(prev => new Set(prev).add(id))
+        return
+      }
+      const data = await res.json()
+      if (data.meaning || data.explanation) {
+        setItems(prev => prev.map(v =>
+          v.id === id
+            ? { ...v, vi_meaning: data.meaning || '', vi_explanation: data.explanation || '' }
+            : v
+        ))
+      } else {
+        setViFailed(prev => new Set(prev).add(id))
+      }
+    } catch {
+      setViFailed(prev => new Set(prev).add(id))
+    } finally {
+      setViLoading(prev => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }, [items])
 
   const clearFilters = useCallback(() => {
     setQuery('')
@@ -275,6 +317,9 @@ export default function VocabLibrary({ items: initialItems, timezone, today }: P
                       onToggle={() => handleToggleStatus(item.id, item.status)}
                       onDelete={() => handleDelete(item.id)}
                       onRetry={() => handleRetryLookup(item.headword, item.definition?.part_of_speech ?? '')}
+                      onFetchVi={() => handleFetchVietnamese(item.id)}
+                      viLoadingState={viLoading.has(item.id)}
+                      viFailedState={viFailed.has(item.id)}
                       entryDateLabel={formatEntryDate(item.entry_date)}
                       entryHref={item.entry_date ? `/diary/${item.entry_date}` : undefined}
                     />
@@ -337,6 +382,9 @@ function VocabCard({
   onToggle,
   onDelete,
   onRetry,
+  onFetchVi,
+  viLoadingState,
+  viFailedState,
   entryDateLabel,
   entryHref,
 }: {
@@ -346,12 +394,16 @@ function VocabCard({
   onToggle: () => void
   onDelete: () => void
   onRetry: () => void
+  onFetchVi: () => void
+  viLoadingState: boolean
+  viFailedState: boolean
   entryDateLabel: string
   entryHref?: string
 }) {
   const def = item.definition
   const chip = item.change_type ? TYPE_CHIPS[item.change_type] : null
   const isKnown = item.status === 'known'
+  const viState = getViCardState(item)
 
   return (
     <div
@@ -412,6 +464,42 @@ function VocabCard({
           Retry lookup
         </button>
       ) : null}
+
+      {/* Vietnamese section */}
+      {(viState === 'has-both' || viState === 'has-meaning-only') ? (
+        <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+          <p className="m-0 text-[13px] leading-[1.55] text-ink font-medium">
+            {item.vi_meaning}
+          </p>
+          {viState === 'has-both' && item.vi_explanation && (
+            <p className="m-0 mt-1 text-[12.5px] leading-[1.55] text-ink-2">
+              {item.vi_explanation}
+            </p>
+          )}
+        </div>
+      ) : viLoadingState ? (
+        <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+          <span className="text-[12.5px] text-ink-3 italic">Đang tải…</span>
+        </div>
+      ) : viFailedState ? (
+        <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+          <button
+            onClick={onFetchVi}
+            className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-wax hover:underline p-0"
+          >
+            Không tải được — thử lại
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-dashed border-line mt-[3px] pt-[7px]">
+          <button
+            onClick={onFetchVi}
+            className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-brass hover:underline p-0"
+          >
+            Xem tiếng Việt
+          </button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center gap-[9px] mt-1 pt-[10px] border-t border-line flex-wrap">
