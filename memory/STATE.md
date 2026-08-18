@@ -1,19 +1,22 @@
 # State
 
-**Last updated:** 2026-08-18 — Hotfix: sửa lỗi "Failed — tap to retry" ở
-vocabulary / nút "Vn" (nguyên nhân: budget token quá lớn làm cạn trần TPM)
+**Last updated:** 2026-08-18 — Hotfix 18c + 18d: sửa lỗi "Failed — tap to retry"
+ở vocabulary / nút "Vn". HAI nguyên nhân chồng nhau: (1) budget token quá lớn làm
+cạn trần TPM, (2) thiếu `SUPABASE_SERVICE_ROLE_KEY` trên Vercel làm route 500.
 
 ## Where things stand
 
 Phases 1-17 đã xong. Không có phase nào đang chạy.
 
-**Đang chờ user:** chạy `vercel --prod` để deploy. Lần này gói deploy gồm CẢ hai
-hotfix chưa lên production:
-- `src/lib/ai/provider.ts` (fix reasoning budget — hotfix trước, vẫn chưa deploy)
-- fix TPM/rate-limit + cache của vocabulary & Vn (hotfix hôm nay)
+**Đã deploy production** (`6b974b8`, alias https://diary-sand-eight.vercel.app),
+đã push lên `origin/main`. Gói deploy gồm cả hotfix `provider.ts` từ trước.
 
-Env `AI_MODEL` trên Vercel đã đổi xong lúc 14:12 (Production + Preview).
-Deploy bị chặn bởi permission classifier nên session không tự chạy được.
+**Đang chờ user:** đăng nhập production và bấm thử vocabulary + nút "Vn".
+Session KHÔNG tự verify được đường AI trên production vì route bị middleware
+chặn khi chưa auth (trả 307 về /login).
+
+**Env Vercel:** đã thêm `SUPABASE_SERVICE_ROLE_KEY` (Production + Preview) ngày
+2026-08-18. Trước đó project chỉ có 6 biến và THIẾU key này — xem discovery 18d.
 
 ## Completed
 
@@ -28,10 +31,18 @@ Deploy bị chặn bởi permission classifier nên session không tự chạy �
 - [x] Phase 13: In-entry vocabulary saving — verified 2026-08-06
 - [x] Phase 14: Vocabulary library page (/vocabulary) — verified 2026-08-06
 - [x] Phases 15-17: Prompt tuning, Vietnamese popover, Vietnamese on vocab cards — committed `e4d22e3`
-- [x] Hotfix 2026-08-18c: vocabulary/Vn hay "Failed — tap to retry" — fixed ở local, chưa deploy
+- [x] Hotfix 2026-08-18c: TPM/rate-limit + cache của vocabulary & Vn — deployed `e953e9b`
+- [x] Hotfix 2026-08-18d: thiếu service role key trên Vercel + cache trên critical path — deployed `6b974b8`
 
 ## Most important findings so far
 
+- **2026-08-18d — LUÔN kiểm `vercel env ls production` khi thêm biến env mới.**
+  `SUPABASE_SERVICE_ROLE_KEY` thiếu trên Vercel suốt từ Phase 13 → mọi request
+  vocabulary/Vn trên production đều 500, dù local pass. Phase 13/14 "verified"
+  chỉ là verified ở LOCAL.
+- **2026-08-18d — cache KHÔNG BAO GIỜ được nằm trên critical path.**
+  `createServiceClient()` throw ngoài try/catch làm chết cả request đã có sẵn kết
+  quả LLM. Nay ghi cache là best-effort, bọc try/catch ở cả 2 route.
 - **2026-08-18c — Groq trừ TPM theo `max_completion_tokens` ĐẶT TRƯỚC, không
   phải token thực dùng.** Một lần bấm "Vn" (thực tế chỉ tốn 44–150 token) từng
   đăng ký 5.000 → chiếm 5.157/8.000 TPM → lần bấm thứ 2 trong cùng phút luôn 429.
@@ -64,6 +75,9 @@ Deploy bị chặn bởi permission classifier nên session không tự chạy �
 - Env AI tùy chọn: `AI_REASONING_EFFORT` (default `low`), `AI_MAX_TOKENS`
   (default 5000), `AI_MAX_TOKENS_SMALL` (default 700 — MỚI). Chưa set trên
   Vercel — dùng default là đúng.
+- Env Vercel production hiện có 7 biến: 2 Supabase public + `SUPABASE_SERVICE_ROLE_KEY`
+  + `AI_PROVIDER` + `AI_MODEL` + `AI_API_KEY` + `AI_DAILY_LIMIT`.
+  `LOOKUP_DAILY_LIMIT` chưa set → default 30.
 - `AI_MODEL_SMALL` chưa set → `callAISmall` fallback về `AI_MODEL`.
 - `SuggestionPanel.tsx` vẫn nuốt message lỗi thật của server (chỉ hiện
   "Something went wrong on our side"). `VocabPopover.tsx` thì ĐÃ sửa — nay hiện
@@ -83,16 +97,17 @@ Deploy bị chặn bởi permission classifier nên session không tự chạy �
 
 - Branch: `main`
 - Latest commit: `e4d22e3` — Phases 15-17
-- **Chưa commit:** `src/lib/ai/provider.ts`, `src/app/api/vocab/lookup/route.ts`,
-  `src/app/api/vocab/vietnamese/route.ts`, `src/components/VocabPopover.tsx`,
-  memory files. `.env.local` gitignored. User chưa yêu cầu commit.
+- **Chưa commit:** chỉ còn memory files + 12 ảnh screenshot chưa track trong
+  `docs/design/` (có từ trước, không thuộc hotfix này). `.env.local` gitignored.
 - 354 tests pass, `npx tsc --noEmit` sạch, `npm run build` sạch.
 
 ## Next action
 
-1. User test lại ở local (`npm run dev`): bấm nhiều từ liên tiếp + nút "Vn".
-2. Chạy `vercel --prod` để deploy cả hai hotfix.
-3. Nếu muốn: commit (session chưa commit vì user chưa yêu cầu).
-4. Cân nhắc: `SuggestionPanel.tsx` vẫn nuốt message lỗi thật — sửa giống
+1. **User test trên production**: đăng nhập, mở một entry, bấm nhiều từ liên
+   tiếp + nút "Vn". Bấm cùng MỘT từ hai lần — lần thứ hai phải ra ngay lập tức
+   (cache đã hoạt động trở lại).
+2. Nếu vẫn lỗi: message trên UI giờ là message THẬT của server, đọc nó; hoặc
+   chạy `vercel logs <deployment-url> --json` để lấy log runtime.
+3. Cân nhắc: `SuggestionPanel.tsx` vẫn nuốt message lỗi thật — sửa giống
    `VocabPopover.tsx` thì sự cố sau này tự lộ nguyên nhân.
-5. Sau đó: chờ user quyết định phase tiếp theo.
+4. Sau đó: chờ user quyết định phase tiếp theo.

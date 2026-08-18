@@ -22,6 +22,52 @@ Format mỗi entry:
 
 ---
 
+## [Hotfix 2026-08-18d] `SUPABASE_SERVICE_ROLE_KEY` thiếu trên Vercel + ghi cache nằm trên đường critical — Tier: Moderate
+
+**Triệu chứng:** sau khi deploy hotfix 18c, user vẫn báo "Failed — tap to retry".
+
+**Finding:** `vercel env ls production` cho thấy project CHỈ có 6 biến:
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `AI_PROVIDER`,
+`AI_MODEL`, `AI_API_KEY`, `AI_DAILY_LIMIT`. **Không có `SUPABASE_SERVICE_ROLE_KEY`.**
+
+`createServiceClient()` throw ngay khi thiếu key này. Trong CẢ HAI route
+`/api/vocab/vietnamese` (bước 8) và `/api/vocab/lookup` (bước 8), lời gọi đó nằm
+**NGOÀI** try/catch → throw thoát khỏi handler → Next trả HTTP 500 (body HTML) →
+client `res.json()` fail → `data` null → rơi vào nhánh cuối cùng và hiện đúng
+chuỗi literal "Failed — tap to retry".
+
+Điểm quan trọng: **lời gọi LLM đã THÀNH CÔNG trước đó**, bản dịch đã nằm trong
+tay, rồi route mới chết lúc đi ghi cache. Nên trên production tính năng này hỏng
+**mọi lần** (trừ full cache hit — mà cache thì chưa bao giờ ghi được, xem 18c).
+Đây là lý do 18c chưa đủ: 18c sửa nguyên nhân rate-limit thật, nhưng còn nguyên
+nhân thứ hai này che phía sau.
+
+**Vì sao trước đây "verified" mà không lộ:** Phase 13/14 verify ở local, nơi
+`.env.local` CÓ `SUPABASE_SERVICE_ROLE_KEY`. Chênh lệch env local↔production
+không được kiểm.
+
+**How it was handled (Moderate — tự xử lý):**
+1. Thêm `SUPABASE_SERVICE_ROLE_KEY` vào Vercel (Production + Preview) qua
+   `vercel env add`, pipe thẳng từ `.env.local`, không in giá trị ra màn hình.
+2. Ghi cache là **best-effort** — không bao giờ được phép giết request đang thành
+   công. Bọc service client + toàn bộ cache write trong try/catch ở cả 2 route.
+3. `/api/vocab/lookup`: khi không ghi được row, vẫn TRẢ definition đã fetch
+   (`id: null`, `cached: false`) thay vì 500. Bước link `saved_vocab` chỉ chạy
+   khi thực sự có row id.
+
+**Bài học chung:** cache tồn tại để tiết kiệm cho request SAU. Nó không bao giờ
+được nằm trên đường critical của request HIỆN TẠI. Kiểm tra `vercel env ls` mỗi
+khi thêm một biến env mới vào code — local pass không nói lên gì về production.
+
+**Verify:** `npx tsc --noEmit` sạch, `npm run build` sạch, 354/354 test pass,
+kiểm tra tĩnh xác nhận `createServiceClient()` nay nằm trong try ở cả 2 file.
+Deploy `6b974b8`. **Chưa verify được đường AI trên production** vì cần đăng nhập
+— user phải tự bấm thử.
+
+**Status:** resolved ở code + env; chờ user xác nhận trên production.
+
+---
+
 ## [Hotfix 2026-08-18c] Groq tính TPM theo `max_completion_tokens` ĐẶT TRƯỚC, không phải token thực dùng — Tier: Moderate
 
 **Triệu chứng user báo:** bấm vào một từ để dùng chức năng vocabulary hoặc nút
