@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTodayInTimezone } from '@/lib/dates';
-import { callAI } from '@/lib/ai/provider';
+import { callAI, smallMaxTokens } from '@/lib/ai/provider';
 import {
   normaliseHeadword,
   routeLookup,
@@ -44,11 +44,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid headword.' }, { status: 400 });
   }
 
-  // 4. Check cache
+  // 4. Check cache.
+  // /api/vocab/vietnamese seeds a row carrying only vi_meaning, so a row
+  // existing is not the same as a definition existing — require the text.
   const { data: cached } = await supabase
     .from('vocab_definitions')
     .select('id, headword, ipa, part_of_speech, definition, example, source')
     .eq('headword', normHeadword)
+    .neq('definition', '')
     .single();
 
   if (cached) {
@@ -113,7 +116,12 @@ export async function POST(req: NextRequest) {
   if (!result) {
     // LLM path
     try {
-      const raw = await callAI(DEFINITION_PROMPT, normHeadword);
+      // A dictionary entry is a few dozen tokens. Asking for the full budget
+      // would reserve it against the provider's per-minute ceiling and make the
+      // next lookup fail with 429.
+      const raw = await callAI(DEFINITION_PROMPT, normHeadword, {
+        maxTokens: smallMaxTokens(),
+      });
       result = parseLookupResponse(raw);
       source = 'llm';
     } catch (err) {
@@ -128,40 +136,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 8. Insert into vocab_definitions using service role (bypasses RLS)
+  // 8. Write to vocab_definitions using service role (bypasses RLS).
+  // Upsert rather than insert: the row may already exist as a Vietnamese-only
+  // stub, or a concurrent request may have won the race. Either way we want the
+  // definition filled in, and vi_meaning (absent from this payload) preserved.
   const serviceClient = createServiceClient();
-  const { data: inserted, error: insertError } = await serviceClient
+  const { data: upserted, error: upsertError } = await serviceClient
     .from('vocab_definitions')
-    .insert({
-      headword: normHeadword,
-      ipa: result.ipa,
-      part_of_speech: result.part_of_speech,
-      definition: result.definition,
-      example: result.example,
-      source,
-    })
+    .upsert(
+      {
+        headword: normHeadword,
+        ipa: result.ipa,
+        part_of_speech: result.part_of_speech,
+        definition: result.definition,
+        example: result.example,
+        source,
+      },
+      { onConflict: 'headword' },
+    )
     .select('id, headword, ipa, part_of_speech, definition, example, source')
     .single();
 
-  // ON CONFLICT: if another request inserted the same headword concurrently,
-  // fetch the existing row instead
-  let definition = inserted;
-  if (insertError) {
-    if (insertError.code === '23505') {
-      // Unique violation — another request won the race
-      const { data: existing } = await supabase
-        .from('vocab_definitions')
-        .select('id, headword, ipa, part_of_speech, definition, example, source')
-        .eq('headword', normHeadword)
-        .single();
-      definition = existing;
-    } else {
-      console.error('[/api/vocab/lookup] insert failed:', insertError.message);
-      return NextResponse.json(
-        { error: 'Could not cache definition.', definition: null },
-        { status: 500 },
-      );
-    }
+  let definition = upserted;
+  if (upsertError) {
+    console.error('[/api/vocab/lookup] cache write failed:', upsertError.message);
+    definition = null;
   }
 
   if (!definition) {

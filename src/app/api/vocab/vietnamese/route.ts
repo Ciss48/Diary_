@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getTodayInTimezone } from '@/lib/dates';
-import { callAISmall } from '@/lib/ai/provider';
+import { callAISmall, type ProviderError } from '@/lib/ai/provider';
 import {
   normaliseHeadword,
   normalisePairKey,
@@ -138,32 +138,48 @@ export async function POST(req: NextRequest) {
       explanation = parsed.explanation;
     }
   } catch (err) {
-    console.error('[/api/vocab/vietnamese] LLM call failed:', (err as Error).message);
-    // Return whatever we have cached
+    const providerErr = err as ProviderError;
+    console.error('[/api/vocab/vietnamese] LLM call failed:', providerErr.message);
+
+    // A provider rate limit is temporary and retrying in a few seconds works.
+    // Say so, instead of reporting it as the same dead end as a real failure.
+    const rateLimited = providerErr.status === 429;
+
     return NextResponse.json(
       {
-        error: 'Could not fetch Vietnamese translation.',
+        error: rateLimited
+          ? 'The AI service is busy. Try again in a moment.'
+          : 'Could not fetch Vietnamese translation.',
+        code: rateLimited ? 'rate_limited' : 'provider_error',
+        retryAfter: rateLimited ? providerErr.retryAfter ?? null : null,
+        // Return whatever we have cached
         meaning: cachedMeaning,
         explanation: cachedExplanation,
         fromCache: meaningFromCache || explanationFromCache,
       },
-      { status: 502 },
+      { status: rateLimited ? 429 : 502 },
     );
   }
 
   // 8. Cache results via service role
   const serviceClient = createServiceClient();
 
-  // 8a. Cache meaning on vocab_definitions
+  // 8a. Cache meaning on vocab_definitions.
+  // Must be an upsert: most words the user taps have never been through
+  // /api/vocab/lookup, so there is no row to UPDATE. An update-only write
+  // silently matched zero rows and the meaning was re-fetched from the LLM on
+  // every single tap — the main reason this endpoint kept hitting the provider
+  // rate limit. Columns not listed here keep their existing values.
   if (!meaningFromCache && meaning && normHeadword) {
-    await serviceClient
+    const { error } = await serviceClient
       .from('vocab_definitions')
-      .update({ vi_meaning: meaning, vi_source: 'llm' })
-      .eq('headword', normHeadword)
-      .eq('vi_meaning', '')
-      .then(({ error }) => {
-        if (error) console.error('[/api/vocab/vietnamese] meaning cache write failed:', error.message);
-      });
+      .upsert(
+        { headword: normHeadword, vi_meaning: meaning, vi_source: 'llm' },
+        { onConflict: 'headword' },
+      );
+    if (error) {
+      console.error('[/api/vocab/vietnamese] meaning cache write failed:', error.message);
+    }
   }
 
   // 8b. Cache explanation

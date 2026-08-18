@@ -22,7 +22,7 @@ type ViState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'loaded'; meaning: string; explanation: string }
-  | { status: 'error' }
+  | { status: 'error'; message: string }
 
 export default function VocabPopover({
   anchorRect,
@@ -143,13 +143,7 @@ export default function VocabPopover({
     onSound()
   }, [fragment, onSound])
 
-  const handleVietnamese = useCallback(async () => {
-    if (vi.status === 'loaded') {
-      // Toggle off
-      setVi({ status: 'idle' })
-      return
-    }
-
+  const fetchVietnamese = useCallback(async () => {
     setVi({ status: 'loading' })
     try {
       const res = await fetch('/api/vocab/vietnamese', {
@@ -161,35 +155,57 @@ export default function VocabPopover({
         }),
       })
 
-      if (!res.ok) {
-        // Check if we got partial data in the error response
-        try {
-          const data = await res.json()
-          if (data.meaning) {
-            setVi({ status: 'loaded', meaning: data.meaning, explanation: data.explanation ?? '' })
-            return
-          }
-        } catch { /* fall through to error */ }
-        setVi({ status: 'error' })
+      const data = await res.json().catch(() => null)
+
+      // Even an error response may carry a cached meaning — show it rather
+      // than making the user retry for something we already have.
+      if (data?.meaning) {
+        setVi({
+          status: 'loaded',
+          meaning: data.meaning,
+          explanation: data.explanation ?? '',
+        })
         return
       }
 
-      const data = await res.json()
+      if (!res.ok) {
+        // The server tells us whether this is temporary; a rate limit reads very
+        // differently to the user than a genuine failure.
+        const retryAfter = typeof data?.retryAfter === 'number' ? data.retryAfter : null
+        const message =
+          data?.code === 'rate_limited'
+            ? retryAfter
+              ? `Too busy — retry in ${retryAfter}s`
+              : 'Too busy — tap to retry'
+            : typeof data?.error === 'string' && data.error
+              ? `${data.error} — tap to retry`
+              : 'Failed — tap to retry'
+        setVi({ status: 'error', message })
+        return
+      }
+
       setVi({
         status: 'loaded',
-        meaning: data.meaning || '',
-        explanation: data.explanation || '',
+        meaning: data?.meaning || '',
+        explanation: data?.explanation || '',
       })
     } catch {
-      setVi({ status: 'error' })
+      setVi({ status: 'error', message: 'Could not reach the server — tap to retry' })
     }
-  }, [fragment, originalText, vi.status])
+  }, [fragment, originalText])
+
+  const handleVietnamese = useCallback(() => {
+    if (vi.status === 'loaded') {
+      // Toggle off
+      setVi({ status: 'idle' })
+      return
+    }
+    void fetchVietnamese()
+  }, [vi.status, fetchVietnamese])
 
   const handleRetry = useCallback(() => {
-    setVi({ status: 'idle' })
-    // Trigger fetch on next tick
-    setTimeout(() => handleVietnamese(), 0)
-  }, [handleVietnamese])
+    void fetchVietnamese()
+  }, [fetchVietnamese])
 
   const viExpanded = vi.status !== 'idle'
 
@@ -288,9 +304,9 @@ export default function VocabPopover({
           {vi.status === 'error' && (
             <button
               onClick={handleRetry}
-              className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-wax hover:underline p-0"
+              className="border-0 bg-transparent cursor-pointer font-sans text-[12.5px] text-wax hover:underline p-0 text-left"
             >
-              Failed — tap to retry
+              {vi.message}
             </button>
           )}
         </div>
