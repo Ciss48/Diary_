@@ -140,43 +140,70 @@ export async function POST(req: NextRequest) {
   // Upsert rather than insert: the row may already exist as a Vietnamese-only
   // stub, or a concurrent request may have won the race. Either way we want the
   // definition filled in, and vi_meaning (absent from this payload) preserved.
-  const serviceClient = createServiceClient();
-  const { data: upserted, error: upsertError } = await serviceClient
-    .from('vocab_definitions')
-    .upsert(
-      {
-        headword: normHeadword,
-        ipa: result.ipa,
-        part_of_speech: result.part_of_speech,
-        definition: result.definition,
-        example: result.example,
-        source,
-      },
-      { onConflict: 'headword' },
-    )
-    .select('id, headword, ipa, part_of_speech, definition, example, source')
-    .single();
+  //
+  // Caching is best-effort. We already have the definition the user asked for,
+  // so a write failure — including createServiceClient() throwing because
+  // SUPABASE_SERVICE_ROLE_KEY is absent — must not turn this into an error
+  // response. It only means the next lookup pays for the fetch again.
+  let definition: {
+    id: string;
+    headword: string;
+    ipa: string;
+    part_of_speech: string;
+    definition: string;
+    example: string;
+    source: string;
+  } | null = null;
 
-  let definition = upserted;
-  if (upsertError) {
-    console.error('[/api/vocab/lookup] cache write failed:', upsertError.message);
-    definition = null;
+  try {
+    const serviceClient = createServiceClient();
+    const { data: upserted, error: upsertError } = await serviceClient
+      .from('vocab_definitions')
+      .upsert(
+        {
+          headword: normHeadword,
+          ipa: result.ipa,
+          part_of_speech: result.part_of_speech,
+          definition: result.definition,
+          example: result.example,
+          source,
+        },
+        { onConflict: 'headword' },
+      )
+      .select('id, headword, ipa, part_of_speech, definition, example, source')
+      .single();
+
+    if (upsertError) throw new Error(upsertError.message);
+    definition = upserted;
+  } catch (err) {
+    console.error('[/api/vocab/lookup] cache write skipped:', (err as Error).message);
   }
 
-  if (!definition) {
-    return NextResponse.json(
-      { error: 'Could not cache definition.', definition: null },
-      { status: 500 },
-    );
+  // 9. Link to saved_vocab rows for this user — only possible once the
+  // definition has a row id.
+  if (definition) {
+    await supabase
+      .from('saved_vocab')
+      .update({ definition_id: definition.id })
+      .eq('user_id', user.id)
+      .eq('headword', normHeadword)
+      .is('definition_id', null);
+
+    return NextResponse.json({ definition, fromCache: false });
   }
 
-  // 9. Link to saved_vocab rows for this user
-  await supabase
-    .from('saved_vocab')
-    .update({ definition_id: definition.id })
-    .eq('user_id', user.id)
-    .eq('headword', normHeadword)
-    .is('definition_id', null);
-
-  return NextResponse.json({ definition, fromCache: false });
+  // Uncached fallback: serve what we fetched, without a row id.
+  return NextResponse.json({
+    definition: {
+      id: null,
+      headword: normHeadword,
+      ipa: result.ipa,
+      part_of_speech: result.part_of_speech,
+      definition: result.definition,
+      example: result.example,
+      source,
+    },
+    fromCache: false,
+    cached: false,
+  });
 }

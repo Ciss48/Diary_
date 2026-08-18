@@ -161,42 +161,53 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 8. Cache results via service role
-  const serviceClient = createServiceClient();
+  // 8. Cache results via service role.
+  // Caching is best-effort and must never sink a translation we already have:
+  // createServiceClient() throws when SUPABASE_SERVICE_ROLE_KEY is absent, and
+  // an uncaught throw here turned a successful lookup into a 500 that the UI
+  // showed as "Failed — tap to retry".
+  try {
+    const serviceClient = createServiceClient();
 
-  // 8a. Cache meaning on vocab_definitions.
-  // Must be an upsert: most words the user taps have never been through
-  // /api/vocab/lookup, so there is no row to UPDATE. An update-only write
-  // silently matched zero rows and the meaning was re-fetched from the LLM on
-  // every single tap — the main reason this endpoint kept hitting the provider
-  // rate limit. Columns not listed here keep their existing values.
-  if (!meaningFromCache && meaning && normHeadword) {
-    const { error } = await serviceClient
-      .from('vocab_definitions')
-      .upsert(
-        { headword: normHeadword, vi_meaning: meaning, vi_source: 'llm' },
-        { onConflict: 'headword' },
-      );
-    if (error) {
-      console.error('[/api/vocab/vietnamese] meaning cache write failed:', error.message);
+    // 8a. Cache meaning on vocab_definitions.
+    // Must be an upsert: most words the user taps have never been through
+    // /api/vocab/lookup, so there is no row to UPDATE. An update-only write
+    // silently matched zero rows and the meaning was re-fetched from the LLM on
+    // every single tap — the main reason this endpoint kept hitting the provider
+    // rate limit. Columns not listed here keep their existing values.
+    if (!meaningFromCache && meaning && normHeadword) {
+      const { error } = await serviceClient
+        .from('vocab_definitions')
+        .upsert(
+          { headword: normHeadword, vi_meaning: meaning, vi_source: 'llm' },
+          { onConflict: 'headword' },
+        );
+      if (error) {
+        console.error('[/api/vocab/vietnamese] meaning cache write failed:', error.message);
+      }
     }
-  }
 
-  // 8b. Cache explanation
-  if (!explanationFromCache && explanation && hasOriginal) {
-    await serviceClient
-      .from('vi_explanations')
-      .insert({
-        norm_corrected: normCorrected,
-        norm_original: normOriginal,
-        explanation,
-      })
-      .then(({ error }) => {
-        // Ignore unique violation (race condition)
-        if (error && error.code !== '23505') {
-          console.error('[/api/vocab/vietnamese] explanation cache write failed:', error.message);
-        }
-      });
+    // 8b. Cache explanation
+    if (!explanationFromCache && explanation && hasOriginal) {
+      await serviceClient
+        .from('vi_explanations')
+        .insert({
+          norm_corrected: normCorrected,
+          norm_original: normOriginal,
+          explanation,
+        })
+        .then(({ error }) => {
+          // Ignore unique violation (race condition)
+          if (error && error.code !== '23505') {
+            console.error('[/api/vocab/vietnamese] explanation cache write failed:', error.message);
+          }
+        });
+    }
+  } catch (err) {
+    console.error(
+      '[/api/vocab/vietnamese] cache write skipped:',
+      (err as Error).message,
+    );
   }
 
   return NextResponse.json({
